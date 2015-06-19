@@ -621,11 +621,11 @@
 
         convertTexturePixels();
         if (!texture.pixels) {
-            if (txture.dstFormat == "i8")
+            if (texture.dstFormat == "i8")
                 texture.pixels = new Uint8Array(texture.width * texture.height);
-            else if (txture.dstFormat == "i8_a8")
+            else if (texture.dstFormat == "i8_a8")
                 texture.pixels = new Uint8Array(texture.width * texture.height * 2);
-            else if (txture.dstFormat == "rgba8")
+            else if (texture.dstFormat == "rgba8")
                 texture.pixels = new Uint8Array(texture.width * texture.height * 4);
         }
 
