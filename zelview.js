@@ -106,6 +106,7 @@
             var scene = zelview0.loadMainScene(gl);
             var model = makeModelFromScene(scene);
             viewer.setModels([model]);
+            viewer.resetCamera();
         };
     }
 
@@ -193,6 +194,10 @@
         viewer.gl = gl;
         viewer.setModels = function(models) {
             scene.setModels(models);
+        };
+        viewer.resetCamera = function() {
+            mat4.identity(camera);
+            scene.setCamera(camera);
         };
 
         var keysDown = {};
