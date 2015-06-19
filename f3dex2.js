@@ -58,10 +58,10 @@
         vtxArray[0] = pos[0]; vtxArray[1] = pos[1]; vtxArray[2] = pos[2];
         vtxArray[3] = txU; vtxArray[4] = txV;
 
-        vtxArray[5] = rom.view.getUint8(offs + 12);
-        vtxArray[6] = rom.view.getUint8(offs + 13);
-        vtxArray[7] = rom.view.getUint8(offs + 14);
-        vtxArray[8] = rom.view.getUint8(offs + 15);
+        vtxArray[5] = rom.view.getUint8(offs + 12) / 256;
+        vtxArray[6] = rom.view.getUint8(offs + 13) / 256;
+        vtxArray[7] = rom.view.getUint8(offs + 14) / 256;
+        vtxArray[8] = rom.view.getUint8(offs + 15) / 256;
     }
 
     function cmd_VTX(state, w0, w1) {
@@ -115,7 +115,7 @@
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuffer);
             gl.vertexAttribPointer(prog.positionLocation, 3, gl.FLOAT, false, VERTEX_BYTES, 0);
             gl.vertexAttribPointer(prog.uvLocation, 2, gl.FLOAT, false, VERTEX_BYTES, 3 * Float32Array.BYTES_PER_ELEMENT);
-            gl.vertexAttribPointer(prog.colorLocation, 3, gl.FLOAT, false, VERTEX_BYTES, 5 * Float32Array.BYTES_PER_ELEMENT);
+            gl.vertexAttribPointer(prog.colorLocation, 4, gl.FLOAT, false, VERTEX_BYTES, 5 * Float32Array.BYTES_PER_ELEMENT);
             gl.enableVertexAttribArray(prog.positionLocation);
             gl.enableVertexAttribArray(prog.colorLocation);
             gl.enableVertexAttribArray(prog.uvLocation);
@@ -680,8 +680,6 @@
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, tile.wrapS);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, tile.wrapT);
             var prog = gl.currentProgram;
-            if (isNaN(1 / tile.width))
-                XXX
             gl.uniform2fv(prog.txsLocation, [1 / tile.width, 1 / tile.height]);
         });
     }
