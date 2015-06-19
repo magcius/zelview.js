@@ -94,33 +94,37 @@
         return { render: render };
     }
 
-    function sceneCombo(gl, sceneGraph, manifest) {
+    function loadScene(gl, sceneGraph, filename) {
         var textures = document.querySelector('#textures');
+        sceneGraph.setModels([]);
+        textures.innerHTML = '';
+
+        var fn = 'scenes/' + filename + '.zelview0';
+        var req = fetch(fn);
+        req.onload = function() {
+            var zelview0 = readZELVIEW0(req.response);
+            var scene = zelview0.loadMainScene(gl);
+            var model = makeModelFromScene(scene);
+            sceneGraph.setModels([model]);
+        };
+    }
+
+    function sceneCombo(gl, sceneGraph, manifest) {
         var pl = document.querySelector('#pl');
 
         var select = document.createElement('select');
         manifest.forEach(function(entry) {
             var option = document.createElement('option');
             option.textContent = entry.label;
-            option.zelview0 = entry.filename;
+            option.filename = entry.filename;
             select.appendChild(option);
         });
         pl.appendChild(select);
         var button = document.createElement('button');
         button.textContent = 'Load';
         button.addEventListener('click', function() {
-            sceneGraph.setModels([]);
-            textures.innerHTML = '';
-
             var option = select.childNodes[select.selectedIndex];
-            var fn = 'scenes/' + option.zelview0 + '.zelview0';
-            var req = fetch(fn);
-            req.onload = function() {
-                var zelview0 = readZELVIEW0(req.response);
-                var scene = zelview0.loadMainScene(gl);
-                var model = makeModelFromScene(scene);
-                sceneGraph.setModels([model]);
-            };
+            loadScene(gl, sceneGraph, option.filename);
         });
         pl.appendChild(button);
     }
