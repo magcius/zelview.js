@@ -367,15 +367,14 @@
     // XXX: This is global to cut down on resources between DLs.
     var tileCache = {};
     function loadTile(state, tile) {
-        if (tile.loaded)
+        if (tile.pixels)
             return;
 
         var key = tileCacheKey(tile);
         var otherTile = tileCache[key];
         if (!otherTile) {
             translateTexture(state, tile);
-            if (tile.loaded)
-                tileCache[key] = tile;
+            tileCache[key] = otherTile;
         } else if (tile !== otherTile) {
             tile.textureId = otherTile.textureId;
             tile.width = otherTile.width;
@@ -447,7 +446,6 @@
             }
         }
 
-        texture.loaded = true;
         texture.pixels = dst;
     }
 
@@ -472,7 +470,6 @@
             }
         }
 
-        texture.loaded = true;
         texture.pixels = dst;
     }
 
@@ -499,7 +496,6 @@
             }
         }
 
-        texture.loaded = true;
         texture.pixels = dst;
     }
 
@@ -523,7 +519,6 @@
             }
         }
 
-        texture.loaded = true;
         texture.pixels = dst;
     }
 
@@ -538,7 +533,6 @@
                 dst[i++] = state.rom.view.getUint8(srcOffs++);
         }
 
-        texture.loaded = true;
         texture.pixels = dst;
     }
 
@@ -563,7 +557,6 @@
             }
         }
 
-        texture.loaded = true;
         texture.pixels = dst;
     }
 
@@ -583,7 +576,6 @@
             }
         }
 
-        texture.loaded = true;
         texture.pixels = dst;
     }
 
@@ -600,7 +592,6 @@
             }
         }
 
-        texture.loaded = true;
         texture.pixels = dst;
     }
 
@@ -608,8 +599,6 @@
         var gl = state.gl;
 
         calcTextureSize(texture);
-
-        var UNKNOWN = {};
 
         function convertTexturePixels() {
             switch (texture.format) {
@@ -624,25 +613,21 @@
                 // 16-bit
                 case 0x10: return convert_RGBA16(state, texture); // RGBA
                 case 0x70: return convert_IA16(state, texture);   // IA
-                case 0x50: return UNKNOWN;
                 default: console.error("Unsupported texture", texture.format.toString(16));
             }
         }
 
         texture.dstFormat = calcTextureDestFormat(texture);
 
-        var marker = convertTexturePixels();
-        if (marker === UNKNOWN) {
+        convertTexturePixels();
+        if (!texture.pixels) {
             if (txture.dstFormat == "i8")
                 texture.pixels = new Uint8Array(texture.width * texture.height);
             else if (txture.dstFormat == "i8_a8")
                 texture.pixels = new Uint8Array(texture.width * texture.height * 2);
             else if (txture.dstFormat == "rgba8")
                 texture.pixels = new Uint8Array(texture.width * texture.height * 4);
-            texture.loaded = true;
         }
-        if (!texture.loaded)
-            return;
 
         function translateWrap(cm) {
             switch (cm) {
