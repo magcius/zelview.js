@@ -94,9 +94,9 @@
         return { render: render };
     }
 
-    function loadScene(gl, sceneGraph, filename) {
+    function loadScene(gl, viewer, filename) {
         var textures = document.querySelector('#textures');
-        sceneGraph.setModels([]);
+        viewer.setModels([]);
         textures.innerHTML = '';
 
         var fn = 'scenes/' + filename + '.zelview0';
@@ -105,11 +105,11 @@
             var zelview0 = readZELVIEW0(req.response);
             var scene = zelview0.loadMainScene(gl);
             var model = makeModelFromScene(scene);
-            sceneGraph.setModels([model]);
+            viewer.setModels([model]);
         };
     }
 
-    function sceneCombo(gl, sceneGraph, manifest) {
+    function sceneCombo(gl, viewer, manifest) {
         var pl = document.querySelector('#pl');
 
         var select = document.createElement('select');
@@ -124,20 +124,20 @@
         button.textContent = 'Load';
         button.addEventListener('click', function() {
             var option = select.childNodes[select.selectedIndex];
-            loadScene(gl, sceneGraph, option.filename);
+            loadScene(gl, viewer, option.filename);
         });
         pl.appendChild(button);
     }
 
-    function loadManifest(gl, sceneGraph) {
+    function loadManifest(gl, viewer) {
         var req = fetch('manifest.json', 'json');
         req.onload = function() {
             var manifest = req.response;
-            sceneCombo(gl, sceneGraph, manifest);
+            sceneCombo(gl, viewer, manifest);
         };
     }
 
-    function createScene(gl) {
+    function createSceneGraph(gl) {
         var projection = mat4.create();
         mat4.perspective(projection, Math.PI / 4, gl.viewportWidth / gl.viewportHeight, 0.2, 50000);
 
@@ -179,18 +179,21 @@
         return scene;
     }
 
-    window.addEventListener('load', function() {
+    function createViewer() {
         var canvas = document.querySelector("canvas");
         var gl = canvas.getContext("webgl", { alpha: false });
         gl.viewportWidth = canvas.width;
         gl.viewportHeight = canvas.height;
 
-        var scene = createScene(gl);
-        var camera = mat4.create();
-        scene.setCamera(camera);
+        var scene = createSceneGraph(gl);
 
-        loadManifest(gl, scene);
-        // loadROM(gl, scene);
+        var camera = mat4.create();
+
+        var viewer = {};
+        viewer.gl = gl;
+        viewer.setModels = function(models) {
+            scene.setModels(models);
+        };
 
         var keysDown = {};
         var dragging = false, lx = 0, ly = 0;
@@ -263,8 +266,14 @@
             scene.setCamera(camera);
             window.requestAnimationFrame(update);
         }
-
         update(0);
+
+        return viewer;
+    }
+
+    window.addEventListener('load', function() {
+        var viewer = createViewer();
+        loadManifest(viewer.gl, viewer);
     });
 
 })(window);
