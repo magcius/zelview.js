@@ -367,14 +367,14 @@
     // XXX: This is global to cut down on resources between DLs.
     var tileCache = {};
     function loadTile(state, tile) {
-        if (tile.pixels)
+        if (tile.textureId)
             return;
 
         var key = tileCacheKey(tile);
         var otherTile = tileCache[key];
         if (!otherTile) {
             translateTexture(state, tile);
-            tileCache[key] = otherTile;
+            tileCache[key] = tile;
         } else if (tile !== otherTile) {
             tile.textureId = otherTile.textureId;
             tile.width = otherTile.width;
