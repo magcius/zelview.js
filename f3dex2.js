@@ -184,6 +184,7 @@
     var OtherModeL = {
         Z_CMP: 0x0010,
         Z_UPD: 0x0020,
+        ZMODE_DEC: 0x0C00,
         CVG_X_ALPHA: 0x1000,
         ALPHA_CVG_SEL: 0x2000,
         FORCE_BL: 0x4000,
@@ -212,6 +213,13 @@
             alphaTestMode = ((newMode & OtherModeL.CVG_X_ALPHA) ? 0x1 : 0 |
                              (newMode & OtherModeL.ALPHA_CVG_SEL) ? 0x2 : 0);
             gl.disable(gl.BLEND);
+        }
+
+        if (newMode & OtherModeL.ZMODE_DEC) {
+            gl.enable(gl.POLYGON_OFFSET_FILL);
+            gl.polygonOffset(-0.5, -0.5);
+        } else {
+            gl.disable(gl.POLYGON_OFFSET_FILL);
         }
 
         gl.uniform1i(prog.alphaTestLocation, alphaTestMode);
