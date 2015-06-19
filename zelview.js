@@ -94,55 +94,6 @@
         return { render: render };
     }
 
-    /*
-    function makeBox(gl) {
-        var verts = new Float32Array(4*3);
-        var indxs = new Uint8Array(6);
-
-        var z = -50;
-
-        verts[0] = -100;
-        verts[1] = -100;
-        verts[2] = z;
-        verts[3] = -100;
-        verts[4] = 100;
-        verts[5] = z;
-        verts[6] = 100;
-        verts[7] = -100;
-        verts[8] = z;
-        verts[9] = 100;
-        verts[10] = 100;
-        verts[11] = z;
-
-        indxs[0] = 0;
-        indxs[1] = 1;
-        indxs[2] = 2;
-        indxs[3] = 1;
-        indxs[4] = 2;
-        indxs[5] = 3;
-
-        var vb = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, vb);
-        gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
-
-        var ib = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indxs, gl.STATIC_DRAW);
-
-        function render() {
-            var prog = gl.currentProgram;
-            gl.bindBuffer(gl.ARRAY_BUFFER, vb);
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-            gl.enableVertexAttribArray(prog.positionLocation);
-            gl.vertexAttribPointer(prog.positionLocation, 3, gl.FLOAT, false, 0, 0);
-            gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_BYTE, 0);
-            gl.disableVertexAttribArray(prog.positionLocation);
-        }
-
-        return { render: render };
-    }
-    */
-
     function sceneCombo(rom, sceneGraph) {
         var select = document.createElement('select');
         for (var label in rom.SCENES) {

@@ -353,14 +353,6 @@
         loadTile(state, state.textureTile);
     }
 
-    function cmd_LOADBLOCK(state, w0, w1) {
-        /*
-        var tile = state.textureTile = state.tile;
-        tile.addr = state.textureImage.addr;
-        loadTile(state, tile);
-        */
-    }
-
     function tileCacheKey(tile) {
         // XXX: Do we need more than this?
         return tile.addr;
@@ -751,7 +743,6 @@
     CommandDispatch[UCodeCommands.POPMTX] = cmd_POPMTX;
     CommandDispatch[UCodeCommands.SETOTHERMODE_L] = cmd_SETOTHERMODE_L;
     CommandDispatch[UCodeCommands.LOADTLUT] = cmd_LOADTLUT;
-    CommandDispatch[UCodeCommands.LOADBLOCK] = cmd_LOADBLOCK;
     CommandDispatch[UCodeCommands.TEXTURE] = cmd_TEXTURE;
     CommandDispatch[UCodeCommands.SETTIMG] = cmd_SETTIMG;
     CommandDispatch[UCodeCommands.SETTILE] = cmd_SETTILE;
@@ -768,10 +759,6 @@
         tile.addr = state.textureImage.addr;
         loadTile(state, state.textureTile);
         state.cmds.push(function(gl) {
-            if (tile.textureId === undefined) {
-                console.log(tile);
-                XXX
-            }
             gl.bindTexture(gl.TEXTURE_2D, tile.textureId);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, tile.wrapS);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, tile.wrapT);
