@@ -57,13 +57,22 @@
             }
         };
         zelview0.lookupAddress = function(banks, addr) {
-            var bank = addr >>> 24;
+            var bankIdx = addr >>> 24;
             var offs = addr & 0x00FFFFFF;
-            switch (bank) {
-                case 0x02: return banks.scene + offs;
-                case 0x03: return banks.room + offs;
-                default: return null;
+            function findBank(bankIdx) {
+                switch (bankIdx) {
+                    case 0x02: return banks.scene;
+                    case 0x03: return banks.room;
+                    default: return null;
+                }
             }
+            var bank = findBank(bankIdx);
+            if (bank === null)
+                return null;
+            var absOffs = bank.vStart + offs;
+            if (absOffs > bank.vEnd)
+                return null;
+            return absOffs;
         };
         zelview0.loadAddress = function(banks, addr) {
             var offs = zelview0.lookupAddress(banks, addr);
@@ -109,10 +118,10 @@
             return rom.loadAddress(banks, addr);
         }
 
-        function readRoom(offs) {
+        function readRoom(file) {
             var banks2 = Object.create(banks);
-            banks2.room = offs;
-            return readHeaders(gl, rom, offs, banks2);
+            banks2.room = file;
+            return readHeaders(gl, rom, file.vStart, banks2);
         }
 
         function readRooms(nRooms, roomTableAddr) {
@@ -120,7 +129,7 @@
             for (var i = 0; i < nRooms; i++) {
                 var pStart = loadAddress(roomTableAddr);
                 var file = rom.lookupFile(pStart);
-                rooms.push(readRoom(file.vStart));
+                rooms.push(readRoom(file));
                 roomTableAddr += 8;
             }
             return rooms;
@@ -197,8 +206,8 @@
     }
 
     function readScene(gl, zelview0, file) {
-        var offs = file.vStart;
-        return readHeaders(gl, zelview0, offs, { scene: offs });
+        var banks = { scene: file };
+        return readHeaders(gl, zelview0, file.vStart, banks);
     }
 
 })(window);

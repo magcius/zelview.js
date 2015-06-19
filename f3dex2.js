@@ -619,7 +619,10 @@
 
         texture.dstFormat = calcTextureDestFormat(texture);
 
-        convertTexturePixels();
+        var srcOffs = state.lookupAddress(texture.addr);
+        if (srcOffs !== null)
+            convertTexturePixels();
+
         if (!texture.pixels) {
             if (texture.dstFormat == "i8")
                 texture.pixels = new Uint8Array(texture.width * texture.height);
