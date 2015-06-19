@@ -34,11 +34,12 @@
         'attribute vec4 a_color;',
         'varying vec4 v_color;',
         'varying vec2 v_uv;',
+        'uniform vec2 u_txs;',
         '',
         'void main() {',
         '    gl_Position = u_projection * u_modelView * vec4(a_position, 1.0);',
         '    v_color = a_color;',
-        '    v_uv = a_uv;',
+        '    v_uv = a_uv * u_txs;',
         '}',
     ]);
 
@@ -47,9 +48,12 @@
         'varying vec2 v_uv;',
         'varying vec4 v_color;',
         'uniform sampler2D u_texture;',
+        'uniform int u_alphaTest;',
         '',
         'void main() {',
         '    gl_FragColor = texture2D(u_texture, v_uv);',
+        '    if (u_alphaTest > 0 && gl_FragColor.a < 1.0)',
+        '        discard;',
         '}',
     ]);
 
@@ -62,6 +66,8 @@
         gl.linkProgram(prog);
         prog.modelViewLocation = gl.getUniformLocation(prog, "u_modelView");
         prog.projectionLocation = gl.getUniformLocation(prog, "u_projection");
+        prog.txsLocation = gl.getUniformLocation(prog, "u_txs");
+        prog.alphaTestLocation = gl.getUniformLocation(prog, "u_alphaTest");
         prog.positionLocation = gl.getAttribLocation(prog, "a_position");
         prog.colorLocation = gl.getAttribLocation(prog, "a_color");
         prog.uvLocation = gl.getAttribLocation(prog, "a_uv");

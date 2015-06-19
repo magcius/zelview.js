@@ -29,6 +29,7 @@
         SETCOMBINE: 0xFC,
         SETTIMG: 0xFD,
         RDPLOADSYNC: 0xE6,
+        RDPPIPESYNC: 0xE7,
     };
 
     var UCodeNames = {};
@@ -39,6 +40,7 @@
     var VERTEX_SIZE = 9;
     var VERTEX_BYTES = VERTEX_SIZE * Float32Array.BYTES_PER_ELEMENT;
 
+    var N = 0;
     function readVertex(state, which, addr) {
         var rom = state.rom;
         var offs = state.lookupAddress(addr);
@@ -49,14 +51,12 @@
         var pos = vec3.clone([posX, posY, posZ]);
         vec3.transformMat4(pos, pos, state.mtx);
 
-        var txU = rom.view.getUint16(offs+8) * (1/32);
-        var txV = rom.view.getUint16(offs+10) * (1/32);
-        var tx = vec2.clone([txU, txV]);
-        vec2.normalize(tx, tx);
+        var txU = rom.view.getInt16(offs+8, false) * (1/32);
+        var txV = rom.view.getInt16(offs+10, false) * (1/32);
 
         var vtxArray = new Float32Array(state.vertexBuffer.buffer, which * VERTEX_BYTES, VERTEX_SIZE);
         vtxArray[0] = pos[0]; vtxArray[1] = pos[1]; vtxArray[2] = pos[2];
-        vtxArray[3] = tx[0]; vtxArray[4] = tx[1];
+        vtxArray[3] = txU; vtxArray[4] = txV;
 
         vtxArray[5] = rom.view.getUint8(offs + 12);
         vtxArray[6] = rom.view.getUint8(offs + 13);
@@ -153,7 +153,6 @@
         var cullFront = newMode & GeometryMode.CULL_FRONT;
         var cullBack = newMode & GeometryMode.CULL_BACK;
 
-        /*
         if (cullFront && cullBack)
             gl.cullFace(gl.FRONT_AND_BACK);
         else if (cullFront)
@@ -165,7 +164,6 @@
             gl.enable(gl.CULL_FACE);
         else
             gl.disable(gl.CULL_FACE);
-        */
     }
 
     function cmd_GEOMETRYMODE(state, w0, w1) {
@@ -180,6 +178,9 @@
     var OtherModeL = {
         Z_CMP: 0x0010,
         Z_UPD: 0x0020,
+        CVG_X_ALPHA: 0x1000,
+        ALPHA_CVG_SEL: 0x2000,
+        FORCE_BL: 0x4000,
     };
 
     function syncRenderMode(gl, newMode) {
@@ -192,6 +193,22 @@
             gl.depthMask(true);
         else
             gl.depthMask(false);
+
+        var prog = gl.currentProgram;
+        var alphaTestMode;
+
+        if (newMode & OtherModeL.FORCE_BL) {
+            alphaTestMode = 0;
+            gl.enable(gl.BLEND);
+            // XXX: additional blend funcs?
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        } else {
+            alphaTestMode = ((newMode & OtherModeL.CVG_X_ALPHA) ? 0x1 : 0 |
+                             (newMode & OtherModeL.ALPHA_CVG_SEL) ? 0x2 : 0);
+            gl.disable(gl.BLEND);
+        }
+
+        gl.uniform1i(prog.alphaTestLocation, alphaTestMode);
     }
 
     function cmd_SETOTHERMODE_L(state, w0, w1) {
@@ -245,10 +262,6 @@
 
         state.boundTexture.scaleS = (s+1) / 0x10000;
         state.boundTexture.scaleT = (t+1) / 0x10000;
-
-        state.cmds.push(function(gl) {
-            gl.bindTexture(gl.TEXTURE_2D, boundTexture.textureId);
-        });
     }
 
     function r5g5b5a1(dst, dstOffs, p) {
@@ -257,7 +270,7 @@
         r = (p & 0xF800) >> 11;
         r = (r << (8-5)) | (r >> (10-8));
 
-        g = (p & 0x0C70) >> 6;
+        g = (p & 0x07C0) >> 6;
         g = (g << (8-5)) | (g >> (10-8));
 
         b = (p & 0x003E) >> 1;
@@ -280,8 +293,7 @@
     }
 
     function cmd_SETTILE(state, w0, w1) {
-        if (!state.tile)
-            state.tile = {};
+        state.tile = {};
         var tile = state.tile;
 
         tile.format = (w0 >> 16) & 0xFF;
@@ -307,11 +319,10 @@
     }
 
     function cmd_LOADTLUT(state, w0, w1) {
-        var tile = state.tile;
         var srcOffs = state.lookupAddress(state.textureImage.addr);
 
         // XXX: properly implement uls/ult/lrs/lrt
-        var size = w1 & (0x00FFF000) >> 14 + 1;
+        var size = ((w1 & 0x00FFF000) >> 14) + 1;
         var dst = new Uint8Array(size * 4);
         var dstOffs = 0;
 
@@ -322,19 +333,18 @@
             dstOffs += 4;
         }
 
-        tile.pixels = dst;
-        state.palette = tile;
+        state.paletteTile = state.tile;
+        state.paletteTile.pixels = dst;
+
+        loadTile(state, state.textureTile);
     }
 
     function cmd_LOADBLOCK(state, w0, w1) {
-        var tile = state.tile;
+        /*
+        var tile = state.textureTile = state.tile;
         tile.addr = state.textureImage.addr;
-        var entry = loadTile(state, tile);
-        state.cmds.push(function(gl) {
-            gl.bindTexture(gl.TEXTURE_2D, entry.textureId);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, entry.wrapS);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, entry.wrapT);
-        });
+        loadTile(state, tile);
+        */
     }
 
     function tileCacheKey(tile) {
@@ -345,10 +355,22 @@
     // XXX: This is global to cut down on resources between DLs.
     var tileCache = {};
     function loadTile(state, tile) {
+        if (tile.loaded)
+            return;
+
         var key = tileCacheKey(tile);
-        if (!tileCache[key])
-            tileCache[key] = translateTexture(state, tile);
-        return tileCache[key];
+        var otherTile = tileCache[key];
+        if (!otherTile) {
+            translateTexture(state, tile);
+            if (tile.loaded)
+                tileCache[key] = tile;
+        } else if (tile !== otherTile) {
+            tile.textureId = otherTile.textureId;
+            tile.width = otherTile.width;
+            tile.height = otherTile.height;
+            tile.wrapS = otherTile.wrapS;
+            tile.wrapT = otherTile.wrapT;
+        }
     }
 
     function convert_I4(state, texture) {
@@ -358,10 +380,9 @@
         var i = 0;
 
         for (var y = 0; y < texture.height; y++) {
-            var srcRow = srcOffs;
             for (var x = 0; x < texture.width; x += 2) {
                 var b, p;
-                b = state.rom.view.getUint8(srcRow++);
+                b = state.rom.view.getUint8(srcOffs++);
 
                 p = (b & 0xF0) >> 4;
                 p = p << 4 | p;
@@ -371,10 +392,26 @@
                 p = p >> 4 | p;
                 dst[i++] = p;
             }
-            srcOffs += texture.rowStride;
         }
 
         return dst;
+    }
+
+    function textureToCanvas(texture) {
+        var canvas = document.createElement("canvas");
+        canvas.width = texture.width;
+        canvas.height = texture.height;
+
+        var ctx = canvas.getContext("2d");
+        var imgData = ctx.createImageData(canvas.width, canvas.height);
+
+        for (var i = 0; i < imgData.data.length; i++)
+            imgData.data[i] = texture.pixels[i];
+
+        canvas.title = '0x' + texture.addr.toString(16);
+        ctx.putImageData(imgData, 0, 0);
+        document.body.appendChild(canvas);
+        return canvas;
     }
 
     function convert_CI8(state, texture) {
@@ -382,23 +419,23 @@
         var nBytes = texture.width * texture.height * 4;
         var dst = new Uint8Array(nBytes);
         var i = 0;
-        if (!state.palette)
-            return dst;
-        var palette = state.palette.tile.pixels;
+        var palette = state.paletteTile.pixels;
+        if (!palette)
+            return;
 
         for (var y = 0; y < texture.height; y++) {
-            var srcRow = srcOffs;
             for (var x = 0; x < texture.width; x++) {
-                var idx = state.rom.view.getUint8(srcRow++);
+                var idx = state.rom.view.getUint8(srcOffs)*4;
                 dst[i++] = palette[idx++];
                 dst[i++] = palette[idx++];
                 dst[i++] = palette[idx++];
                 dst[i++] = palette[idx++];
+                srcOffs++;
             }
-            srcOffs += texture.rowStride;
         }
 
-        return dst;
+        texture.loaded = true;
+        texture.pixels = dst;
     }
 
     function convert_I8(state, texture) {
@@ -408,13 +445,12 @@
         var i = 0;
 
         for (var y = 0; y < texture.height; y++) {
-            var srcRow = srcOffs;
             for (var x = 0; x < texture.width; x++)
-                dst[i++] = state.rom.view.getUint8(srcRow++);
-            srcOffs += texture.rowStride;
+                dst[i++] = state.rom.view.getUint8(srcOffs++);
         }
 
-        return dst;
+        texture.loaded = true;
+        texture.pixels = dst;
     }
 
     function convert_RGBA16(state, texture) {
@@ -424,17 +460,41 @@
         var i = 0;
 
         for (var y = 0; y < texture.height; y++) {
-            var srcRow = srcOffs;
             for (var x = 0; x < texture.width; x++) {
                 var pixel = rom.view.getUint16(srcOffs, false);
                 r5g5b5a1(dst, i, pixel);
-                srcOffs += 2;
                 i += 4;
+                srcOffs += 2;
             }
-            srcOffs += texture.rowStride;
         }
 
-        return dst;
+        texture.loaded = true;
+        texture.pixels = dst;
+    }
+
+    function convert_IA8(state, texture) {
+        var srcOffs = state.lookupAddress(texture.addr);
+        var nBytes = texture.width * texture.height * 2;
+        var dst = new Uint8Array(nBytes);
+        var i = 0;
+
+        for (var y = 0; y < texture.height; y++) {
+            for (var x = 0; x < texture.width; x++) {
+                var p, b;
+                b = state.rom.view.getUint8(srcOffs++);
+
+                p = (b & 0xF0) >> 4;
+                p = p << 4 | p;
+                dst[i++] = p;
+
+                p = (b & 0x0F);
+                p = p >> 4 | p;
+                dst[i++] = p;
+            }
+        }
+
+        texture.loaded = true;
+        texture.pixels = dst;
     }
 
     function convert_IA16(state, texture) {
@@ -444,22 +504,22 @@
         var i = 0;
 
         for (var y = 0; y < texture.height; y++) {
-            var srcRow = srcOffs;
             for (var x = 0; x < texture.width; x++) {
-                dst[i++] = state.rom.view.getUint8(srcRow++);
-                dst[i++] = state.rom.view.getUint8(srcRow++);
+                dst[i++] = state.rom.view.getUint8(srcOffs++);
+                dst[i++] = state.rom.view.getUint8(srcOffs++);
             }
-            srcOffs += texture.rowStride;
         }
 
-        return dst;
+        texture.loaded = true;
+        texture.pixels = dst;
     }
 
     function translateTexture(state, texture) {
         var gl = state.gl;
-        var out = {};
 
         calcTextureSize(texture);
+
+        var UNKNOWN = {};
 
         function convertTexturePixels() {
             switch (texture.format) {
@@ -467,16 +527,30 @@
                 case 0x80: return convert_I4(state, texture);     // I
                 // 8-bit
                 case 0x48: return convert_CI8(state, texture);    // CI
+                case 0x68: return convert_IA8(state, texture);    // IA
                 case 0x88: return convert_I8(state, texture);     // I
                 // 16-bit
                 case 0x10: return convert_RGBA16(state, texture); // RGBA
                 case 0x70: return convert_IA16(state, texture);   // IA
-                case 0x50: return null;
+                case 0x50: return UNKNOWN;
                 default: console.error("Unsupported texture", texture.format.toString(16));
             }
         }
 
-        var pixels = convertTexturePixels();
+        var dstFormat = calcTextureDestFormat(texture);
+
+        var marker = convertTexturePixels();
+        if (marker === UNKNOWN) {
+            if (dstFormat == "i8")
+                texture.pixels = new Uint8Array(texture.width * texture.height);
+            else if (dstFormat == "i8_a8")
+                texture.pixels = new Uint8Array(texture.width * texture.height * 2);
+            else if (dstFormat == "rgba8")
+                texture.pixels = new Uint8Array(texture.width * texture.height * 4);
+            texture.loaded = true;
+        }
+        if (!texture.loaded)
+            return;
 
         function translateWrap(cm) {
             switch (cm) {
@@ -487,37 +561,26 @@
             }
         }
 
-        out.wrapS = translateWrap(texture.cms);
-        out.wrapT = translateWrap(texture.cmt);
+        texture.wrapT = translateWrap(texture.cmt);
+        texture.wrapS = translateWrap(texture.cms);
 
         var texId = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texId);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-        var dstFormat = calcTextureDestFormat(texture);
         var glFormat;
         if (dstFormat == "i8")
             glFormat = gl.LUMINANCE;
         else if (dstFormat == "i8_a8")
             glFormat = gl.LUMINANCE_ALPHA;
-        else if (dstFormat == "rgba8")
+        else if (dstFormat == "rgba8") {
             glFormat = gl.RGBA;
-
-        if (!pixels) {
-            if (dstFormat == "i8")
-                pixels = new Uint8Array(texture.width * texture.height);
-            else if (dstFormat == "i8_a8")
-                pixels = new Uint8Array(texture.width * texture.height * 2);
-            else if (dstFormat == "rgba8")
-                pixels = new Uint8Array(texture.width * texture.height * 4);
+            textureToCanvas(texture);
         }
 
-        gl.texImage2D(gl.TEXTURE_2D, 0, glFormat, texture.width, texture.height, 0, glFormat, gl.UNSIGNED_BYTE, pixels);
-
-        out.texture = texture;
-        out.textureId = texId;
-        return out;
+        gl.texImage2D(gl.TEXTURE_2D, 0, glFormat, texture.width, texture.height, 0, glFormat, gl.UNSIGNED_BYTE, texture.pixels);
+        texture.textureId = texId;
     }
 
     function calcTextureDestFormat(texture) {
@@ -604,7 +667,44 @@
 
     var F3DEX2 = {};
 
+    function loadTextureBlock(state, cmds) {
+        cmd_SETTIMG(state, cmds[0][0], cmds[0][1]);
+        cmd_SETTILE(state, cmds[5][0], cmds[5][1]);
+        cmd_SETTILESIZE(state, cmds[6][0], cmds[6][1]);
+        var tile = state.tile;
+        state.textureTile = tile;
+        tile.addr = state.textureImage.addr;
+        loadTile(state, state.textureTile);
+        state.cmds.push(function(gl) {
+            gl.bindTexture(gl.TEXTURE_2D, tile.textureId);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, tile.wrapS);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, tile.wrapT);
+            var prog = gl.currentProgram;
+            if (isNaN(1 / tile.width))
+                XXX
+            gl.uniform2fv(prog.txsLocation, [1 / tile.width, 1 / tile.height]);
+        });
+    }
+
     function runDL(state, addr) {
+        function collectNextCmds() {
+            var L = [];
+            var voffs = offs;
+            for (var i = 0; i < 8; i++) {
+                var cmd0 = rom.view.getUint32(voffs, false);
+                var cmd1 = rom.view.getUint32(voffs + 4, false);
+                L.push([cmd0, cmd1]);
+                voffs += 8;
+            }
+            return L;
+        }
+        function matchesCmdStream(cmds, needle) {
+            for (var i = 0; i < needle.length; i++)
+                if (cmds[i][0] >>> 24 !== needle[i])
+                    return false;
+            return true;
+        }
+
         var rom = state.rom;
         var offs = state.lookupAddress(addr);
         if (offs === null)
@@ -617,7 +717,17 @@
             if (cmdType == UCodeCommands.ENDDL)
                 break;
 
-            // console.log(cmdType.toString(16), UCodeNames[cmdType]);
+            // Texture uploads need to be special.
+            if (cmdType == UCodeCommands.SETTIMG) {
+                var U = UCodeCommands;
+                var nextCmds = collectNextCmds();
+                if (matchesCmdStream(nextCmds, [U.SETTIMG, U.SETTILE, U.RDPLOADSYNC, U.LOADBLOCK, U.RDPPIPESYNC, U.SETTILE, U.SETTILESIZE])) {
+                    loadTextureBlock(state, nextCmds);
+                    offs += 7 * 8;
+                    continue;
+                }
+            }
+
             var func = CommandDispatch[cmdType];
             if (func) func(state, cmd0, cmd1);
             offs += 8;
@@ -636,6 +746,7 @@
         state.vertexBuffer = new Float32Array(32 * VERTEX_SIZE);
         state.verticesDirty = [];
 
+        state.paletteTile = {};
         state.rom = rom;
         state.lookupAddress = function(addr) {
             return rom.lookupAddress(banks, addr);
