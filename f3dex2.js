@@ -373,6 +373,71 @@
         }
     }
 
+    function textureToCanvas(texture) {
+        var canvas = document.createElement("canvas");
+        canvas.width = texture.width;
+        canvas.height = texture.height;
+
+        var ctx = canvas.getContext("2d");
+        var imgData = ctx.createImageData(canvas.width, canvas.height);
+
+        if (texture.dstFormat == "i8") {
+            for (var si = 0, di = 0; di < imgData.data.length; si++, di += 4) {
+                imgData.data[di+0] = texture.pixels[si];
+                imgData.data[di+1] = texture.pixels[si];
+                imgData.data[di+2] = texture.pixels[si];
+                imgData.data[di+3] = 255;
+            }
+        } else if (texture.dstFormat == "i8_a8") {
+            for (var si = 0, di = 0; di < imgData.data.length; si += 2, di += 4) {
+                imgData.data[di+0] = texture.pixels[si];
+                imgData.data[di+1] = texture.pixels[si];
+                imgData.data[di+2] = texture.pixels[si];
+                imgData.data[di+3] = texture.pixels[si + 1];
+            }
+        } else if (texture.dstFormat == "rgba8") {
+            for (var i = 0; i < imgData.data.length; i++)
+                imgData.data[i] = texture.pixels[i];
+        }
+
+        canvas.title = '0x' + texture.addr.toString(16) + '  ' + texture.format.toString(16) + '  ' + texture.dstFormat;
+        ctx.putImageData(imgData, 0, 0);
+        document.body.appendChild(canvas);
+        return canvas;
+    }
+
+    function convert_CI4(state, texture) {
+        var srcOffs = state.lookupAddress(texture.addr);
+        var nBytes = texture.width * texture.height * 4;
+        var dst = new Uint8Array(nBytes);
+        var i = 0;
+        var palette = state.paletteTile.pixels;
+        if (!palette)
+            return;
+
+        for (var y = 0; y < texture.height; y++) {
+            for (var x = 0; x < texture.width; x += 2) {
+                var b, idx;
+                b = state.rom.view.getUint8(srcOffs++);
+
+                idx = ((b & 0xF0) >> 4) * 4;
+                dst[i++] = palette[idx++];
+                dst[i++] = palette[idx++];
+                dst[i++] = palette[idx++];
+                dst[i++] = palette[idx++];
+
+                idx = (b & 0x0F) * 4;
+                dst[i++] = palette[idx++];
+                dst[i++] = palette[idx++];
+                dst[i++] = palette[idx++];
+                dst[i++] = palette[idx++];
+            }
+        }
+
+        texture.loaded = true;
+        texture.pixels = dst;
+    }
+
     function convert_I4(state, texture) {
         var srcOffs = state.lookupAddress(texture.addr);
         var nBytes = texture.width * texture.height;
@@ -389,29 +454,38 @@
                 dst[i++] = p;
 
                 p = (b & 0x0F);
-                p = p >> 4 | p;
+                p = p << 4 | p;
                 dst[i++] = p;
             }
         }
 
-        return dst;
+        texture.loaded = true;
+        texture.pixels = dst;
     }
 
-    function textureToCanvas(texture) {
-        var canvas = document.createElement("canvas");
-        canvas.width = texture.width;
-        canvas.height = texture.height;
+    function convert_IA4(state, texture) {
+        var srcOffs = state.lookupAddress(texture.addr);
+        var nBytes = texture.width * texture.height * 2;
+        var dst = new Uint8Array(nBytes);
+        var i = 0;
 
-        var ctx = canvas.getContext("2d");
-        var imgData = ctx.createImageData(canvas.width, canvas.height);
+        for (var y = 0; y < texture.height; y++) {
+            for (var x = 0; x < texture.width; x++) {
+                var b, p;
+                b = state.rom.view.getUint8(srcOffs++);
 
-        for (var i = 0; i < imgData.data.length; i++)
-            imgData.data[i] = texture.pixels[i];
+                p = (b & 0xF0) >> 4;
+                p = p << 4 | p;
+                dst[i++] = p;
 
-        canvas.title = '0x' + texture.addr.toString(16);
-        ctx.putImageData(imgData, 0, 0);
-        document.body.appendChild(canvas);
-        return canvas;
+                p = (b & 0x0F);
+                p = p << 4 | p;
+                dst[i++] = p;
+            }
+        }
+
+        texture.loaded = true;
+        texture.pixels = dst;
     }
 
     function convert_CI8(state, texture) {
@@ -453,25 +527,6 @@
         texture.pixels = dst;
     }
 
-    function convert_RGBA16(state, texture) {
-        var srcOffs = state.lookupAddress(texture.addr);
-        var nBytes = texture.width * texture.height * 4;
-        var dst = new Uint8Array(nBytes);
-        var i = 0;
-
-        for (var y = 0; y < texture.height; y++) {
-            for (var x = 0; x < texture.width; x++) {
-                var pixel = rom.view.getUint16(srcOffs, false);
-                r5g5b5a1(dst, i, pixel);
-                i += 4;
-                srcOffs += 2;
-            }
-        }
-
-        texture.loaded = true;
-        texture.pixels = dst;
-    }
-
     function convert_IA8(state, texture) {
         var srcOffs = state.lookupAddress(texture.addr);
         var nBytes = texture.width * texture.height * 2;
@@ -490,6 +545,25 @@
                 p = (b & 0x0F);
                 p = p >> 4 | p;
                 dst[i++] = p;
+            }
+        }
+
+        texture.loaded = true;
+        texture.pixels = dst;
+    }
+
+    function convert_RGBA16(state, texture) {
+        var srcOffs = state.lookupAddress(texture.addr);
+        var nBytes = texture.width * texture.height * 4;
+        var dst = new Uint8Array(nBytes);
+        var i = 0;
+
+        for (var y = 0; y < texture.height; y++) {
+            for (var x = 0; x < texture.width; x++) {
+                var pixel = rom.view.getUint16(srcOffs, false);
+                r5g5b5a1(dst, i, pixel);
+                i += 4;
+                srcOffs += 2;
             }
         }
 
@@ -524,6 +598,8 @@
         function convertTexturePixels() {
             switch (texture.format) {
                 // 4-bit
+                case 0x40: return convert_CI4(state, texture);    // CI
+                case 0x60: return convert_IA4(state, texture);    // IA
                 case 0x80: return convert_I4(state, texture);     // I
                 // 8-bit
                 case 0x48: return convert_CI8(state, texture);    // CI
@@ -537,15 +613,15 @@
             }
         }
 
-        var dstFormat = calcTextureDestFormat(texture);
+        texture.dstFormat = calcTextureDestFormat(texture);
 
         var marker = convertTexturePixels();
         if (marker === UNKNOWN) {
-            if (dstFormat == "i8")
+            if (txture.dstFormat == "i8")
                 texture.pixels = new Uint8Array(texture.width * texture.height);
-            else if (dstFormat == "i8_a8")
+            else if (txture.dstFormat == "i8_a8")
                 texture.pixels = new Uint8Array(texture.width * texture.height * 2);
-            else if (dstFormat == "rgba8")
+            else if (txture.dstFormat == "rgba8")
                 texture.pixels = new Uint8Array(texture.width * texture.height * 4);
             texture.loaded = true;
         }
@@ -570,14 +646,14 @@
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
         var glFormat;
-        if (dstFormat == "i8")
+        if (texture.dstFormat == "i8")
             glFormat = gl.LUMINANCE;
-        else if (dstFormat == "i8_a8")
+        else if (texture.dstFormat == "i8_a8")
             glFormat = gl.LUMINANCE_ALPHA;
-        else if (dstFormat == "rgba8") {
+        else if (texture.dstFormat == "rgba8")
             glFormat = gl.RGBA;
-            textureToCanvas(texture);
-        }
+
+        textureToCanvas(texture);
 
         gl.texImage2D(gl.TEXTURE_2D, 0, glFormat, texture.width, texture.height, 0, glFormat, gl.UNSIGNED_BYTE, texture.pixels);
         texture.textureId = texId;
@@ -676,6 +752,10 @@
         tile.addr = state.textureImage.addr;
         loadTile(state, state.textureTile);
         state.cmds.push(function(gl) {
+            if (tile.textureId === undefined) {
+                console.log(tile);
+                XXX
+            }
             gl.bindTexture(gl.TEXTURE_2D, tile.textureId);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, tile.wrapS);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, tile.wrapT);
