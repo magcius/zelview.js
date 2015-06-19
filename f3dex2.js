@@ -476,17 +476,19 @@
         var i = 0;
 
         for (var y = 0; y < texture.height; y++) {
-            for (var x = 0; x < texture.width; x++) {
-                var b, p;
+            for (var x = 0; x < texture.width; x += 2) {
+                var b, p, pm;
                 b = state.rom.view.getUint8(srcOffs++);
 
                 p = (b & 0xF0) >> 4;
-                p = p << 4 | p;
-                dst[i++] = p;
+                pm = p & 0x0E;
+                dst[i++] = (pm << 4 | pm);
+                dst[i++] = (p & 0x01) ? 0xFF : 0x00;
 
                 p = (b & 0x0F);
-                p = p << 4 | p;
-                dst[i++] = p;
+                pm = p & 0x0E;
+                dst[i++] = (pm << 4 | pm);
+                dst[i++] = (p & 0x01) ? 0xFF : 0x00;
             }
         }
 
