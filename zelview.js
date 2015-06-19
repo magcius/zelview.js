@@ -135,7 +135,7 @@
 
     function createScene(gl) {
         var projection = mat4.create();
-        mat4.perspective(projection, Math.PI / 4, gl.viewportWidth / gl.viewportHeight, 0.2, 10000);
+        mat4.perspective(projection, Math.PI / 4, gl.viewportWidth / gl.viewportHeight, 0.2, 50000);
 
         var view = mat4.create();
 
