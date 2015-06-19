@@ -747,6 +747,10 @@
     var F3DEX2 = {};
 
     function loadTextureBlock(state, cmds) {
+        var tileIdx = (cmds[5][1] >> 24) & 0x7;
+        if (tileIdx != 0)
+            return;
+
         cmd_SETTIMG(state, cmds[0][0], cmds[0][1]);
         cmd_SETTILE(state, cmds[5][0], cmds[5][1]);
         cmd_SETTILESIZE(state, cmds[6][0], cmds[6][1]);
