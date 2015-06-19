@@ -113,14 +113,19 @@
         document.body.appendChild(button);
     }
 
-    function loadROM(gl, scene) {
+    function loadZELVIEW0(gl, sceneGraph) {
+        var req = fetch('scenes/ydan_scene.zelview0');
+        req.onload = function() {
+            var zelview0 = readZELVIEW0(req.response);
+            var scene = zelview0.loadMainScene(gl);
+            var model = makeModelFromScene(scene);
+            sceneGraph.setModel(model);
+        };
+    }
+    function loadROM(gl, sceneGraph) {
         var req = fetch('ZELOOTMA.z64');
         req.onload = function() {
             var rom = parseROM(gl, req.response);
-            sceneCombo(rom, scene);
-            // var model = makeModelFromScene(rom.SCENES);
-            // scene.attachModel(model);
-            // scene.attachModel(makeBox(gl));
         };
     }
 
@@ -176,7 +181,7 @@
         var camera = mat4.create();
         scene.setCamera(camera);
 
-        loadROM(gl, scene);
+        loadZELVIEW0(gl, scene);
 
         var keysDown = {};
         var dragging = false, lx = 0, ly = 0;

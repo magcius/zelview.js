@@ -334,6 +334,7 @@
 
     function cmd_LOADTLUT(state, w0, w1) {
         var srcOffs = state.lookupAddress(state.textureImage.addr);
+        var rom = state.rom;
 
         // XXX: properly implement uls/ult/lrs/lrt
         var size = ((w1 & 0x00FFF000) >> 14) + 1;
@@ -561,6 +562,7 @@
     }
 
     function convert_RGBA16(state, texture) {
+        var rom = state.rom;
         var srcOffs = state.lookupAddress(texture.addr);
         var nBytes = texture.width * texture.height * 4;
         var dst = new Uint8Array(nBytes);

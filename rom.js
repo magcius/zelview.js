@@ -28,9 +28,9 @@
                 entry.valid = false;
 
             // Convenience for us -- uncompressed files leave pEnd as blank.
-            entry.length = entry.vEnd - entry.vStart;
+            entry.size = entry.vEnd - entry.vStart;
             if (entry.pEnd == 0)
-                entry.pEnd = entry.pStart + entry.length;
+                entry.pEnd = entry.pStart + entry.size;
 
             offs += 0x10;
             return entry;
@@ -53,7 +53,7 @@
 
             entry.filename = read0String(view.buffer, offs, 64);
             offs += entry.filename.length + 1;
-            offs = (offs + 4) & ~3;
+            offs = (offs + 3) & ~3;
 
             if (entry.filename.endsWith("_scene"))
                 entry.fileType = "scene";
@@ -74,14 +74,13 @@
         }
     }
 
-    function findSceneFile(dmaTable, scene) {
+    function findFile(dmaTable, file) {
         for (var i = 0; i < dmaTable.length; i++) {
             var entry = dmaTable[i];
-            if (entry.pStart == scene.pStart && entry.pEnd == scene.pEnd)
+            if (entry.pStart == file.pStart && entry.pEnd == file.pEnd)
                 return entry;
         }
     }
-
 
     var SCENES = {
         "Inside the Deku Tree": 0x01FC2000,
@@ -196,7 +195,6 @@
         "Item Testing Room": 0x02AF6000,
     };
 
-    /*
     function readSceneTable(rom) {
         // Find the first scene, and then look around for it in the code segment.
         function getFirstScene() {
@@ -227,14 +225,23 @@
         function readSceneEntry() {
             var scene = {};
             scene.pStart = rom.view.getUint32(offs, false);
-            scene.pEnd = rom.view.getUint32(offs, false);
+            scene.pEnd = rom.view.getUint32(offs + 4, false);
+            return scene;
         }
 
-        while (offs < rom.codeEntry.pEnd - (16*16)) {
+        while (offs < rom.codeEntry.pEnd) {
+            var scene = readSceneEntry();
+            sceneTable.push(scene);
+            offs += 20;
 
+            scene.dmaEntry = findFile(rom.dmaTable, scene);
+            if (!scene.dmaEntry)
+                break;
+            scene.filename = scene.dmaEntry.filename;
         }
+
+        return sceneTable;
     }
-    */
 
     var HeaderCommands = {
         Spawns: 0x00,
@@ -274,7 +281,13 @@
         function readRooms(nRooms, roomTableAddr) {
             var rooms = [];
             for (var i = 0; i < nRooms; i++) {
-                rooms.push(readRoom(loadAddress(roomTableAddr)));
+                var start = loadAddress(roomTableAddr);
+                var end = loadAddress(roomTableAddr + 4);
+                console.log(start.toString(16));
+                var room = { pStart: start, pEnd: end };
+                room.dmaEntry = findFile(rom.dmaTable, room);
+                rooms.push(room);
+                // rooms.push(readRoom(loadAddress(roomTableAddr)));
                 roomTableAddr += 8;
             }
             return rooms;
@@ -340,11 +353,13 @@
                     var roomTableAddr = cmd2;
                     headers.rooms = headers.rooms.concat(readRooms(nRooms, roomTableAddr));
                     break;
+                /*
                 case HeaderCommands.Mesh:
                     if (headers.mesh) XXX;
                     var meshAddr = cmd2;
                     headers.mesh = readMesh(meshAddr);
                     break;
+                */
             }
         }
         return headers;
@@ -352,6 +367,83 @@
 
     function readScene(rom, offs) {
         return readHeaders(rom, offs, { scene: offs });
+    }
+
+    function downloadBlob(filename, blob) {
+        var url = window.URL.createObjectURL(blob);
+        var elem = document.createElement('a');
+        elem.setAttribute('href', url);
+        elem.setAttribute('download', filename);
+        document.body.appendChild(elem);
+        elem.click();
+        document.body.removeChild(elem);
+    }
+
+    function buildVFS(rom, files, mainFile) {
+        var MAGIC = "ZELVIEW0";
+        var HEADER_SIZE = 0x8 + 0x8;
+
+        function writeString(view, offs, S, L) {
+            var N = Math.min(S.length, L);
+            for (var i = 0; i < N; i++)
+                view.setUint8(offs++, S.charCodeAt(i));
+            return L;
+        }
+
+        function buildVFS() {
+            var VFS_ENTRY_SIZE = 0x30 + 0x10;
+            var buffer = new ArrayBuffer(HEADER_SIZE + VFS_ENTRY_SIZE * files.length);
+            var view = new DataView(buffer);
+
+            var offs = 0;
+            offs += writeString(view, 0, MAGIC, 0x8);
+            view.setUint32(offs, files.length, true);
+            offs += 0x04;
+            view.setUint32(offs, mainFile, true);
+            offs += 0x04;
+
+            var dataOffs = buffer.byteLength;
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+                offs += writeString(view, offs, file.filename, 0x30);
+                view.setUint32(offs, file.pStart, true);
+                view.setUint32(offs + 0x04, file.pEnd, true);
+                view.setUint32(offs + 0x08, dataOffs, true);
+                dataOffs += file.size;
+                view.setUint32(offs + 0x0C, dataOffs, true);
+                offs += 0x10;
+            }
+
+            return buffer;
+        }
+        function readDMAEntry(file) {
+            console.log(file.pStart, file.size);
+            return rom.view.buffer.slice(file.pStart, file.pEnd);
+        }
+
+        var vfsBuffer = buildVFS();
+        var blobParts = [vfsBuffer];
+        for (var i = 0; i < files.length; i++) {
+            blobParts.push(readDMAEntry(files[i]));
+        }
+
+        console.log(blobParts);
+        var blob = new Blob(blobParts, { type: 'application/octet-stream' });
+        return blob;
+    }
+
+    function buildSceneVFS(rom, sceneEntry) {
+        function gatherFiles() {
+            var files = [sceneEntry.dmaEntry];
+            var scene = readScene(rom, sceneEntry.pStart);
+            files = files.concat(scene.rooms.map(function(r) { return r.dmaEntry; }));
+            return files;
+        }
+
+        var files = gatherFiles();
+        var blob = buildVFS(rom, files);
+        var filename = sceneEntry.filename + '.zelview0';
+        // downloadBlob(filename, blob);
     }
 
     function parseROM(gl, buffer) {
@@ -383,16 +475,17 @@
         rom.dmaTable = readDMATable(view, 0x12F70);
         readFileTable(view, 0xBE80, rom.dmaTable);
 
-        /*
         rom.codeEntry = findCode(rom.dmaTable);
         console.log(rom.codeEntry);
 
-        rom.scenes = readSceneTable(rom, 0x10CBB0);
-        */
+        rom.sceneTable = readSceneTable(rom, 0x10CBB0);
+        buildSceneVFS(rom, rom.sceneTable[0]);
 
+        /*
         rom.readScene = function(startAddr) {
             return readScene(rom, startAddr);
         };
+        */
 
         rom.SCENES = SCENES;
         rom.gl = gl;
