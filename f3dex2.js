@@ -332,6 +332,8 @@
         var entry = loadTile(state, tile);
         state.cmds.push(function(gl) {
             gl.bindTexture(gl.TEXTURE_2D, entry.textureId);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, entry.wrapS);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, entry.wrapT);
         });
     }
 
@@ -479,8 +481,8 @@
         function translateWrap(cm) {
             switch (cm) {
                 case 1: return gl.MIRRORED_REPEAT;
-                case 2: return gl.CLAMP;
-                case 3: return gl.CLAMP;
+                case 2: return gl.CLAMP_TO_EDGE;
+                case 3: return gl.CLAMP_TO_EDGE;
                 default: return gl.REPEAT;
             }
         }
