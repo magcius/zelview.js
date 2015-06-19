@@ -409,7 +409,8 @@
 
         canvas.title = '0x' + texture.addr.toString(16) + '  ' + texture.format.toString(16) + '  ' + texture.dstFormat;
         ctx.putImageData(imgData, 0, 0);
-        document.body.appendChild(canvas);
+        var textures = document.querySelector('#textures');
+        textures.appendChild(canvas);
         return canvas;
     }
 

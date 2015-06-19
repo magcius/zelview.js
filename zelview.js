@@ -95,6 +95,9 @@
     }
 
     function sceneCombo(gl, sceneGraph, manifest) {
+        var textures = document.querySelector('#textures');
+        var pl = document.querySelector('#pl');
+
         var select = document.createElement('select');
         manifest.forEach(function(entry) {
             var option = document.createElement('option');
@@ -102,11 +105,12 @@
             option.zelview0 = entry.filename;
             select.appendChild(option);
         });
-        document.body.appendChild(select);
+        pl.appendChild(select);
         var button = document.createElement('button');
         button.textContent = 'Load';
         button.addEventListener('click', function() {
             sceneGraph.setModels([]);
+            textures.innerHTML = '';
 
             var option = select.childNodes[select.selectedIndex];
             var fn = 'scenes/' + option.zelview0 + '.zelview0';
@@ -118,7 +122,7 @@
                 sceneGraph.setModels([model]);
             };
         });
-        document.body.appendChild(button);
+        pl.appendChild(button);
     }
 
     function loadManifest(gl, sceneGraph) {
