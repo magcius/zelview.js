@@ -140,12 +140,32 @@
     }
     */
 
+    function sceneCombo(rom, sceneGraph) {
+        var select = document.createElement('select');
+        for (var label in rom.SCENES) {
+            var option = document.createElement('option');
+            option.textContent = label;
+            option.startAddr = rom.SCENES[label];
+            select.appendChild(option);
+        }
+        document.body.appendChild(select);
+        var button = document.createElement('button');
+        button.textContent = 'Load';
+        button.addEventListener('click', function() {
+            var option = select.childNodes[select.selectedIndex];
+            var scene = rom.readScene(option.startAddr);
+            sceneGraph.setModel(makeModelFromScene(scene));
+        });
+        document.body.appendChild(button);
+    }
+
     function loadROM(gl, scene) {
         var req = fetch('ZELOOTMA.z64');
         req.onload = function() {
             var rom = parseROM(gl, req.response);
-            var model = makeModelFromScene(rom.scenes[0]);
-            scene.attachModel(model);
+            sceneCombo(rom, scene);
+            // var model = makeModelFromScene(rom.SCENES);
+            // scene.attachModel(model);
             // scene.attachModel(makeBox(gl));
         };
     }
@@ -180,8 +200,8 @@
             models.forEach(renderModel);
         }
 
-        scene.attachModel = function(model) {
-            models.push(model);
+        scene.setModel = function(model) {
+            models = [model];
             render();
         };
         scene.setCamera = function(matrix) {

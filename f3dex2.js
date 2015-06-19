@@ -239,14 +239,14 @@
         var mtx = mat4.create();
 
         for (var x = 0; x < 4; x++) {
-            for (var u = 0; y < 4; y++) {
+            for (var y = 0; y < 4; y++) {
                 var mt1 = rom.view.getUint16(offs, false);
                 var mt2 = rom.view.getUint16(offs + 32, false);
                 mtx[(x * 4) + y] = ((mt1 << 16) | (mt2)) * (1 / 0x10000);
             }
         }
 
-        mat4.mult(state.mtx, state.mtx, mtx);
+        mat4.multiply(state.mtx, state.mtx, mtx);
     }
 
     function cmd_POPMTX(state, w0, w1) {
