@@ -94,22 +94,6 @@
         return { render: render };
     }
 
-    function loadScene(gl, viewer, filename) {
-        var textures = document.querySelector('#textures');
-        viewer.setModels([]);
-        textures.innerHTML = '';
-
-        var fn = 'scenes/' + filename + '.zelview0';
-        var req = fetch(fn);
-        req.onload = function() {
-            var zelview0 = readZELVIEW0(req.response);
-            var scene = zelview0.loadMainScene(gl);
-            var model = makeModelFromScene(scene);
-            viewer.setModels([model]);
-            viewer.resetCamera();
-        };
-    }
-
     function sceneCombo(gl, viewer, manifest) {
         var pl = document.querySelector('#pl');
 
@@ -125,7 +109,7 @@
         button.textContent = 'Load';
         button.addEventListener('click', function() {
             var option = select.childNodes[select.selectedIndex];
-            loadScene(gl, viewer, option.filename);
+            viewer.loadScene(option.filename);
         });
         pl.appendChild(button);
     }
@@ -189,16 +173,80 @@
         var scene = createSceneGraph(gl);
 
         var camera = mat4.create();
+        var filename = '';
+
+        function serializeCamera(c) {
+            var yaw = Math.atan2(-c[8], c[0]);
+            var pitch = Math.asin(-c[6]);
+            var posX = c[12];
+            var posY = c[13];
+            var posZ = c[14];
+            return [yaw, pitch, posX, posY, posZ].map(function(n) { return n.toFixed(4); }).join(',');
+        }
+        function serializeState() {
+            return [filename, serializeCamera(camera)].join('!');
+        }
+        var lastState;
+        function stateUpdated() {
+            var state = serializeState();
+            if (state === lastState)
+                return;
+
+            window.history.replaceState('', '', '#' + state);
+        }
+        function deserializeCamera(c, S) {
+            var parts = S.split(',').map(function(n) { return parseFloat(n); });
+            var yaw = parts[0];
+            var pitch = parts[1];
+            var posX = parts[2], posY = parts[3], posZ = parts[4];
+            mat4.identity(c);
+            mat4.rotateY(c, c, -yaw);
+            mat4.rotateX(c, c, -pitch);
+            c[12] = posX; c[13] = posY; c[14] = posZ;
+        }
+        function loadState(S) {
+            var parts = S.split('!');
+            var filename_ = parts[0], cameraS = parts[1];
+            if (!filename_)
+                return;
+
+            viewer.loadScene(filename_);
+            deserializeCamera(camera, cameraS);
+        }
+
+        function loadScene(filename) {
+            var textures = document.querySelector('#textures');
+            scene.setModels([]);
+            viewer.resetCamera();
+            textures.innerHTML = '';
+
+            var fn = 'scenes/' + filename + '.zelview0';
+            var req = fetch(fn);
+            req.onload = function() {
+                var zelview0 = readZELVIEW0(req.response);
+                var zelScene = zelview0.loadMainScene(gl);
+                var model = makeModelFromScene(zelScene);
+                scene.setModels([model]);
+            };
+        }
 
         var viewer = {};
         viewer.gl = gl;
-        viewer.setModels = function(models) {
-            scene.setModels(models);
+        viewer.loadScene = function(filename_) {
+            filename = filename_;
+            loadScene(filename);
         };
         viewer.resetCamera = function() {
             mat4.identity(camera);
             scene.setCamera(camera);
+            stateUpdated();
         };
+
+        var hash = window.location.hash;
+        if (hash) {
+            hash = hash.slice(1);
+            loadState(hash);
+        }
 
         var keysDown = {};
         var dragging = false, lx = 0, ly = 0;
@@ -269,6 +317,7 @@
             mat4.multiply(camera, camera, tmp);
 
             scene.setCamera(camera);
+            stateUpdated();
             window.requestAnimationFrame(update);
         }
         update(0);
