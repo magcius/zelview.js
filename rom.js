@@ -74,10 +74,10 @@
         }
     }
 
-    function findFile(dmaTable, file) {
+    function findFile(dmaTable, pStart) {
         for (var i = 0; i < dmaTable.length; i++) {
             var entry = dmaTable[i];
-            if (entry.pStart == file.pStart && entry.pEnd == file.pEnd)
+            if (entry.pStart == pStart)
                 return entry;
         }
     }
@@ -195,6 +195,7 @@
         "Item Testing Room": 0x02AF6000,
     };
 
+    /*
     function readSceneTable(rom) {
         // Find the first scene, and then look around for it in the code segment.
         function getFirstScene() {
@@ -242,6 +243,23 @@
 
         return sceneTable;
     }
+    */
+
+    function readSceneTable(rom) {
+        var scenes = [];
+
+        for (var label in SCENES) {
+            var scene = {};
+            var pStart = SCENES[label];
+            scene.pStart = pStart;
+            scene.dmaEntry = findFile(rom.dmaTable, pStart);
+            scene.filename = scene.dmaEntry.filename;
+            scene.label = label;
+            scenes.push(scene);
+        }
+
+        return scenes;
+    }
 
     var HeaderCommands = {
         Spawns: 0x00,
@@ -283,9 +301,8 @@
             for (var i = 0; i < nRooms; i++) {
                 var start = loadAddress(roomTableAddr);
                 var end = loadAddress(roomTableAddr + 4);
-                console.log(start.toString(16));
-                var room = { pStart: start, pEnd: end };
-                room.dmaEntry = findFile(rom.dmaTable, room);
+                var room = {};
+                room.dmaEntry = findFile(rom.dmaTable, start);
                 rooms.push(room);
                 // rooms.push(readRoom(loadAddress(roomTableAddr)));
                 roomTableAddr += 8;
@@ -417,7 +434,6 @@
             return buffer;
         }
         function readDMAEntry(file) {
-            console.log(file.pStart, file.size);
             return rom.view.buffer.slice(file.pStart, file.pEnd);
         }
 
@@ -427,7 +443,6 @@
             blobParts.push(readDMAEntry(files[i]));
         }
 
-        console.log(blobParts);
         var blob = new Blob(blobParts, { type: 'application/octet-stream' });
         return blob;
     }
@@ -443,7 +458,7 @@
         var files = gatherFiles();
         var blob = buildVFS(rom, files);
         var filename = sceneEntry.filename + '.zelview0';
-        // downloadBlob(filename, blob);
+        downloadBlob(filename, blob);
     }
 
     function parseROM(gl, buffer) {
@@ -476,10 +491,23 @@
         readFileTable(view, 0xBE80, rom.dmaTable);
 
         rom.codeEntry = findCode(rom.dmaTable);
-        console.log(rom.codeEntry);
 
         rom.sceneTable = readSceneTable(rom, 0x10CBB0);
-        buildSceneVFS(rom, rom.sceneTable[0]);
+
+        var manifest = [];
+        rom.sceneTable.forEach(function(s) {
+            var me = { filename: s.filename, label: s.label };
+            manifest.push(me);
+        });
+        var S = JSON.stringify(manifest, null, 2);
+        var blob = new Blob([S]);
+        downloadBlob('manifest.json', blob);
+
+        /*
+        rom.sceneTable.forEach(function(s) {
+            buildSceneVFS(rom, s);
+        });
+        */
 
         /*
         rom.readScene = function(startAddr) {

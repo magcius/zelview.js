@@ -1,10 +1,10 @@
 (function(exports) {
     "use strict";
 
-    function fetch(path) {
+    function fetch(path, responseType) {
         var request = new XMLHttpRequest();
         request.open("GET", path, true);
-        request.responseType = "arraybuffer";
+        request.responseType = (responseType || "arraybuffer");
         request.send();
         return request;
     }
@@ -94,38 +94,38 @@
         return { render: render };
     }
 
-    function sceneCombo(rom, sceneGraph) {
+    function sceneCombo(gl, sceneGraph, manifest) {
         var select = document.createElement('select');
-        for (var label in rom.SCENES) {
+        manifest.forEach(function(entry) {
             var option = document.createElement('option');
-            option.textContent = label;
-            option.startAddr = rom.SCENES[label];
+            option.textContent = entry.label;
+            option.zelview0 = entry.filename;
             select.appendChild(option);
-        }
+        });
         document.body.appendChild(select);
         var button = document.createElement('button');
         button.textContent = 'Load';
         button.addEventListener('click', function() {
+            sceneGraph.setModels([]);
+
             var option = select.childNodes[select.selectedIndex];
-            var scene = rom.readScene(option.startAddr);
-            sceneGraph.setModel(makeModelFromScene(scene));
+            var fn = 'scenes/' + option.zelview0 + '.zelview0';
+            var req = fetch(fn);
+            req.onload = function() {
+                var zelview0 = readZELVIEW0(req.response);
+                var scene = zelview0.loadMainScene(gl);
+                var model = makeModelFromScene(scene);
+                sceneGraph.setModels([model]);
+            };
         });
         document.body.appendChild(button);
     }
 
-    function loadZELVIEW0(gl, sceneGraph) {
-        var req = fetch('scenes/ydan_scene.zelview0');
+    function loadManifest(gl, sceneGraph) {
+        var req = fetch('manifest.json', 'json');
         req.onload = function() {
-            var zelview0 = readZELVIEW0(req.response);
-            var scene = zelview0.loadMainScene(gl);
-            var model = makeModelFromScene(scene);
-            sceneGraph.setModel(model);
-        };
-    }
-    function loadROM(gl, sceneGraph) {
-        var req = fetch('ZELOOTMA.z64');
-        req.onload = function() {
-            var rom = parseROM(gl, req.response);
+            var manifest = req.response;
+            sceneCombo(gl, sceneGraph, manifest);
         };
     }
 
@@ -159,8 +159,8 @@
             models.forEach(renderModel);
         }
 
-        scene.setModel = function(model) {
-            models = [model];
+        scene.setModels = function(models_) {
+            models = models_;
             render();
         };
         scene.setCamera = function(matrix) {
@@ -181,7 +181,8 @@
         var camera = mat4.create();
         scene.setCamera(camera);
 
-        loadZELVIEW0(gl, scene);
+        loadManifest(gl, scene);
+        // loadROM(gl, scene);
 
         var keysDown = {};
         var dragging = false, lx = 0, ly = 0;
