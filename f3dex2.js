@@ -58,10 +58,10 @@
         vtxArray[0] = pos[0]; vtxArray[1] = pos[1]; vtxArray[2] = pos[2];
         vtxArray[3] = txU; vtxArray[4] = txV;
 
-        vtxArray[5] = rom.view.getUint8(offs + 12) / 256;
-        vtxArray[6] = rom.view.getUint8(offs + 13) / 256;
-        vtxArray[7] = rom.view.getUint8(offs + 14) / 256;
-        vtxArray[8] = rom.view.getUint8(offs + 15) / 256;
+        vtxArray[5] = rom.view.getUint8(offs + 12) / 255;
+        vtxArray[6] = rom.view.getUint8(offs + 13) / 255;
+        vtxArray[7] = rom.view.getUint8(offs + 14) / 255;
+        vtxArray[8] = rom.view.getUint8(offs + 15) / 255;
     }
 
     function cmd_VTX(state, w0, w1) {

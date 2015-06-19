@@ -54,8 +54,8 @@
         'void main() {',
         '    gl_FragColor = texture2D(u_texture, v_uv);',
         '    if (u_useVertexColors)',
-        '        gl_FragColor = vec4(gl_FragColor.rgb * v_color.rgb, gl_FragColor.a);',
-        '    if (u_alphaTest > 0 && gl_FragColor.a < 1.0)',
+        '        gl_FragColor *= v_color;',
+        '    if (u_alphaTest > 0 && gl_FragColor.a < 0.0125)',
         '        discard;',
         '}',
     ]);
