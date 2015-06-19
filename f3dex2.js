@@ -237,11 +237,8 @@
     }
 
     function cmd_TEXTURE(state, w0, w1) {
-        var tileIdx = (w0 >> 11) & 0x07;
-
         var boundTexture = {};
         state.boundTexture = boundTexture;
-        state.boundTexture.tileIdx = tileIdx;
 
         var s = w1 >> 16;
         var t = w1 & 0x0000FFFF;
@@ -282,15 +279,10 @@
         state.textureImage.addr = w1;
     }
 
-    function getTile(state, tileIdx) {
-        if (!state.textureTiles[tileIdx])
-            state.textureTiles[tileIdx] = { tileIdx: tileIdx };
-        return state.textureTiles[tileIdx];
-    }
-
     function cmd_SETTILE(state, w0, w1) {
-        var tileIdx = (w1 >> 24) & 0x7;
-        var tile = getTile(state, tileIdx);
+        if (!state.tile)
+            state.tile = {};
+        var tile = state.tile;
 
         tile.format = (w0 >> 16) & 0xFF;
         tile.cms = (w1 >> 8) & 0x3;
@@ -302,16 +294,11 @@
         tile.shiftT = (w1 >> 10) & 0xF;
         tile.maskS = (w1 >> 4) & 0xF;
         tile.maskT = (w1 >> 14) & 0xF;
-
-        // XXX: this is super wrong
-        var otherTile = state.tmemMap[tile.tmem];
-        if (otherTile && state.boundTexture.tileIdx === tile.tileIdx)
-            state.boundTexture.textureId = otherTile.textureId;
     }
 
     function cmd_SETTILESIZE(state, w0, w1) {
         var tileIdx = (w1 >> 24) & 0x7;
-        var tile = getTile(state, tileIdx);
+        var tile = state.tile;
 
         tile.uls = (w0 >> 14) & 0x3FF;
         tile.ult = (w0 >> 2) & 0x3FF;
@@ -320,9 +307,7 @@
     }
 
     function cmd_LOADTLUT(state, w0, w1) {
-        var tileIdx = (w1 >> 24) & 0x7;
-        var tile = getTile(state, tileIdx);
-
+        var tile = state.tile;
         var srcOffs = state.lookupAddress(state.textureImage.addr);
 
         // XXX: properly implement uls/ult/lrs/lrt
@@ -342,12 +327,12 @@
     }
 
     function cmd_LOADBLOCK(state, w0, w1) {
-        var tileIdx = (w1 >> 24) & 0x7;
-        var tile = getTile(state, tileIdx);
+        var tile = state.tile;
         tile.addr = state.textureImage.addr;
         var entry = loadTile(state, tile);
-        tile.textureId = entry.textureId;
-        state.tmemMap[tile.tmem] = tile;
+        state.cmds.push(function(gl) {
+            gl.bindTexture(gl.TEXTURE_2D, entry.textureId);
+        });
     }
 
     function tileCacheKey(tile) {
@@ -355,15 +340,13 @@
         return tile.addr;
     }
 
+    // XXX: This is global to cut down on resources between DLs.
+    var tileCache = {};
     function loadTile(state, tile) {
-        var gl = state.gl;
-
         var key = tileCacheKey(tile);
-        if (!state.tileCache[key])
-            state.tileCache[key] = translateTexture(state, tile);
-
-        var entry = state.tileCache[key];
-        return entry;
+        if (!tileCache[key])
+            tileCache[key] = translateTexture(state, tile);
+        return tileCache[key];
     }
 
     function convert_I4(state, texture) {
@@ -486,6 +469,7 @@
                 // 16-bit
                 case 0x10: return convert_RGBA16(state, texture); // RGBA
                 case 0x70: return convert_IA16(state, texture);   // IA
+                case 0x50: return null;
                 default: console.error("Unsupported texture", texture.format.toString(16));
             }
         }
@@ -649,10 +633,6 @@
 
         state.vertexBuffer = new Float32Array(32 * VERTEX_SIZE);
         state.verticesDirty = [];
-
-        state.textureTiles = Array(8);
-        state.tileCache = {};
-        state.tmemMap = {};
 
         state.rom = rom;
         state.lookupAddress = function(addr) {
