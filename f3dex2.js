@@ -132,13 +132,20 @@
         idxData[offs+2] = (cmd >> 1) & 0x7F;
     }
 
+    function flushTexture(state) {
+        if (state.textureTile)
+            loadTile(state, state.textureTile);
+    }
+
     function cmd_TRI1(state, w0, w1) {
+        flushTexture(state);
         var idxData = new Uint8Array(3);
         tri(idxData, 0, w0);
         state.cmds.push(translateTRI(state, idxData));
     }
 
     function cmd_TRI2(state, w0, w1) {
+        flushTexture(state);
         var idxData = new Uint8Array(6);
         tri(idxData, 0, w0); tri(idxData, 3, w1);
         state.cmds.push(translateTRI(state, idxData));
@@ -350,8 +357,6 @@
 
         state.paletteTile = state.tile;
         state.paletteTile.pixels = dst;
-
-        loadTile(state, state.textureTile);
     }
 
     function tileCacheKey(tile) {
@@ -760,8 +765,10 @@
         var tile = state.tile;
         state.textureTile = tile;
         tile.addr = state.textureImage.addr;
-        loadTile(state, state.textureTile);
         state.cmds.push(function(gl) {
+            if (!tile.textureId)
+                return;
+
             gl.bindTexture(gl.TEXTURE_2D, tile.textureId);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, tile.wrapS);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, tile.wrapT);
