@@ -147,6 +147,7 @@
     var GeometryMode = {
         CULL_FRONT: 0x0200,
         CULL_BACK: 0x0400,
+        LIGHTING: 0x020000,
     };
 
     function syncGeometryMode(gl, newMode) {
@@ -164,6 +165,11 @@
             gl.enable(gl.CULL_FACE);
         else
             gl.disable(gl.CULL_FACE);
+
+        var lighting = newMode & GeometryMode.LIGHTING;
+        var useVertexColors = !lighting;
+        var prog = gl.currentProgram;
+        gl.uniform1i(prog.useVertexColorsLocation, useVertexColors);
     }
 
     function cmd_GEOMETRYMODE(state, w0, w1) {

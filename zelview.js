@@ -48,11 +48,13 @@
         'varying vec2 v_uv;',
         'varying vec4 v_color;',
         'uniform sampler2D u_texture;',
+        'uniform bool u_useVertexColors;',
         'uniform int u_alphaTest;',
         '',
         'void main() {',
         '    gl_FragColor = texture2D(u_texture, v_uv);',
-        // '    gl_FragColor = vec4(gl_FragColor.rgb * v_color.rgb, gl_FragColor.a);',
+        '    if (u_useVertexColors)',
+        '        gl_FragColor = vec4(gl_FragColor.rgb * v_color.rgb, gl_FragColor.a);',
         '    if (u_alphaTest > 0 && gl_FragColor.a < 1.0)',
         '        discard;',
         '}',
@@ -69,6 +71,7 @@
         prog.projectionLocation = gl.getUniformLocation(prog, "u_projection");
         prog.txsLocation = gl.getUniformLocation(prog, "u_txs");
         prog.alphaTestLocation = gl.getUniformLocation(prog, "u_alphaTest");
+        prog.useVertexColorsLocation = gl.getUniformLocation(prog, "u_useVertexColors");
         prog.positionLocation = gl.getAttribLocation(prog, "a_position");
         prog.colorLocation = gl.getAttribLocation(prog, "a_color");
         prog.uvLocation = gl.getAttribLocation(prog, "a_uv");
