@@ -274,6 +274,7 @@
             if (state === lastState)
                 return;
 
+            lastState = state;
             window.history.replaceState('', '', '#' + state);
         }
         function deserializeCamera(c, S) {
@@ -315,6 +316,8 @@
         var viewer = {};
         viewer.gl = gl;
         viewer.loadScene = function(filename_) {
+            if (filename === filename_)
+                return;
             filename = filename_;
             loadScene(filename);
         };
@@ -324,8 +327,13 @@
             stateUpdated();
         };
 
-        var hash = window.location.hash.slice(1);
-        loadState(hash);
+        function loadStateFromHash() {
+            var hash = window.location.hash.slice(1);
+            loadState(hash);
+        }
+
+        window.addEventListener('hashchange', loadStateFromHash);
+        loadStateFromHash();
 
         var keysDown = {};
         var SHIFT = 16;
