@@ -263,12 +263,12 @@
         });
 
         canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock;
-        canvas.addEventListener('mousedown', function(e) {
-            canvas.requestPointerLock();
-        });
         document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock || document.webkitExitPointerLock;
-        canvas.addEventListener('mouseup', function(e) {
-            document.exitPointerLock();
+        canvas.addEventListener('click', function(e) {
+            if (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas || document.webkitPointerLockElement === canvas)
+                document.exitPointerLock();
+            else
+                canvas.requestPointerLock();
         });
         function mousemove(e) {
             var dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
@@ -279,9 +279,9 @@
             mat4.rotate(camera, camera, -dy / 500, [1, 0, 0]);
         }
         function pointerlockchange() {
-            if (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas || document.webkitPointerLockElement === canvas) {
+            if (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas || document.webkitPointerLockElement === canvas)
                 canvas.addEventListener('mousemove', mousemove);
-            } else
+            else
                 canvas.removeEventListener('mousemove', mousemove);
         }
         document.addEventListener('pointerlockchange', pointerlockchange);
