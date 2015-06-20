@@ -249,7 +249,6 @@
         }
 
         var keysDown = {};
-        var dragging = false, lx = 0, ly = 0;
         var SHIFT = 16;
 
         function isKeyDown(key) {
@@ -263,25 +262,33 @@
             delete keysDown[e.keyCode];
         });
 
+        canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock;
         canvas.addEventListener('mousedown', function(e) {
-            dragging = true;
-            lx = e.pageX; ly = e.pageY;
+            canvas.requestPointerLock();
         });
+        document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock || document.webkitExitPointerLock;
         canvas.addEventListener('mouseup', function(e) {
-            dragging = false;
+            document.exitPointerLock();
         });
-        canvas.addEventListener('mousemove', function(e) {
-            if (!dragging)
+        function mousemove(e) {
+            var dx = e.movementX || e.mozMovementX || e.webkitMovementX;
+            var dy = e.movementY || e.mozMovementY || e.webkitMovementY;
+            if (!dx || !dy)
                 return;
-
-            var dx = e.pageX - lx;
-            var dy = e.pageY - ly;
             var cu = [camera[1], camera[5], camera[9]];
             vec3.normalize(cu, cu);
             mat4.rotate(camera, camera, -dx / 500, cu);
             mat4.rotate(camera, camera, -dy / 500, [1, 0, 0]);
-            lx = e.pageX; ly = e.pageY;
-        });
+        }
+        function pointerlockchange() {
+            if (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas || document.webkitPointerLockElement === canvas) {
+                canvas.addEventListener('mousemove', mousemove);
+            } else
+                canvas.removeEventListener('mousemove', mousemove);
+        }
+        document.addEventListener('pointerlockchange', pointerlockchange);
+        document.addEventListener('mozpointerlockchange', pointerlockchange);
+        document.addEventListener('webkitpointerlockchange', pointerlockchange);
 
         var tmp = mat4.create();
         var t = 0;
