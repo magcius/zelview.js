@@ -111,6 +111,35 @@
         return prog;
     }
 
+    var WATERS_VERT_SHADER_SOURCE = M([
+        'uniform mat4 u_modelView;',
+        'uniform mat4 u_projection;',
+        'attribute vec3 a_position;',
+        '',
+        'void main() {',
+        '    gl_Position = u_projection * u_modelView * vec4(a_position, 1.0);',
+        '}',
+    ]);
+
+    var WATERS_FRAG_SHADER_SOURCE = M([
+        'void main() {',
+        '    gl_FragColor = vec4(0.2, 0.6, 1.0, 0.2);',
+        '}',
+    ]);
+
+    function createProgram_WATERS(gl) {
+        var vertShader = compileShader(gl, WATERS_VERT_SHADER_SOURCE, gl.VERTEX_SHADER);
+        var fragShader = compileShader(gl, WATERS_FRAG_SHADER_SOURCE, gl.FRAGMENT_SHADER);
+        var prog = gl.createProgram();
+        gl.attachShader(prog, vertShader);
+        gl.attachShader(prog, fragShader);
+        gl.linkProgram(prog);
+        prog.modelViewLocation = gl.getUniformLocation(prog, "u_modelView");
+        prog.projectionLocation = gl.getUniformLocation(prog, "u_projection");
+        prog.positionLocation = gl.getAttribLocation(prog, "a_position");
+        return prog;
+    }
+
     function makeModelFromScene(gl, scene) {
         var coll = scene.collision;
         var collVertBuffer = gl.createBuffer();
@@ -134,18 +163,37 @@
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, collIdxBuffer);
         var lineData = stitchLines(coll.polys);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lineData, gl.STATIC_DRAW);
-        var nPrim = lineData.length;
+        var nLinePrim = lineData.length;
+
+        var wbVtx = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, wbVtx);
+        gl.bufferData(gl.ARRAY_BUFFER, coll.waters, gl.STATIC_DRAW);
+        var wbIdxData = new Uint16Array(coll.waters.length / 3);
+        for (var i = 0; i < wbIdxData.length; i++)
+            wbIdxData[i] = i;
+        var wbIdx = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wbIdx);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, wbIdxData, gl.STATIC_DRAW);
 
         function renderCollision(state) {
-            state.useProgram(state.programs_COLL);
-
-            var prog = gl.currentProgram;
             gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            var prog = state.useProgram(state.programs_COLL);
             gl.bindBuffer(gl.ARRAY_BUFFER, collVertBuffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, collIdxBuffer);
             gl.vertexAttribPointer(prog.positionLocation, 3, gl.SHORT, false, 0, 0);
             gl.enableVertexAttribArray(prog.positionLocation);
-            gl.drawElements(gl.LINES, nPrim, gl.UNSIGNED_SHORT, 0);
+            gl.drawElements(gl.LINES, nLinePrim, gl.UNSIGNED_SHORT, 0);
+            gl.disableVertexAttribArray(prog.positionLocation);
+
+            var prog = state.useProgram(state.programs_WATERS);
+            gl.disable(gl.CULL_FACE);
+            gl.bindBuffer(gl.ARRAY_BUFFER, wbVtx);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, wbIdx);
+            gl.vertexAttribPointer(prog.positionLocation, 3, gl.SHORT, false, 0, 0);
+            gl.enableVertexAttribArray(prog.positionLocation);
+            for (var i = 0; i < wbIdxData.length; i += 4)
+                gl.drawElements(gl.TRIANGLE_STRIP, 4, gl.UNSIGNED_SHORT, i*2);
             gl.disableVertexAttribArray(prog.positionLocation);
             gl.disable(gl.BLEND);
         }
@@ -213,11 +261,13 @@
         state.gl = gl;
         state.programs_DL = createProgram_DL(gl);
         state.programs_COLL = createProgram_COLL(gl);
+        state.programs_WATERS = createProgram_WATERS(gl);
         state.useProgram = function(prog) {
             gl.currentProgram = prog;
             gl.useProgram(prog);
             gl.uniformMatrix4fv(prog.projectionLocation, false, projection);
             gl.uniformMatrix4fv(prog.modelViewLocation, false, view);
+            return prog;
         };
 
         function renderModel(model) {

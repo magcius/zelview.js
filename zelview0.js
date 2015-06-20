@@ -120,10 +120,6 @@
 
         function readCollision(collisionAddr) {
             var offs = rom.lookupAddress(banks, collisionAddr);
-            var vertsN = rom.view.getUint16(offs + 0x0C, false);
-            var vertsAddr = rom.view.getUint32(offs + 0x10, false);
-            var polysN = rom.view.getUint16(offs + 0x14, false);
-            var polysAddr = rom.view.getUint32(offs + 0x18, false);
 
             function readVerts(N, addr) {
                 var offs = rom.lookupAddress(banks, addr);
@@ -136,6 +132,9 @@
                 }
                 return verts;
             }
+            var vertsN = rom.view.getUint16(offs + 0x0C, false);
+            var vertsAddr = rom.view.getUint32(offs + 0x10, false);
+            var verts = readVerts(vertsN, vertsAddr);
 
             function readPolys(N, addr) {
                 var offs = rom.lookupAddress(banks, addr);
@@ -148,11 +147,45 @@
                 }
                 return polys;
             }
-
-            var verts = readVerts(vertsN, vertsAddr);
+            var polysN = rom.view.getUint16(offs + 0x14, false);
+            var polysAddr = rom.view.getUint32(offs + 0x18, false);
             var polys = readPolys(polysN, polysAddr);
 
-            return { verts: verts, polys: polys };
+            function readWaters(N, addr) {
+                // XXX: While we should probably keep the actual stuff about
+                // water boxes, I'm just drawing them, so let's just record
+                // a quad.
+                var offs = rom.lookupAddress(banks, addr);
+                var waters = new Uint16Array(N * 3 * 4);
+
+                for (var i = 0; i < N; i++) {
+                    var x = rom.view.getInt16(offs + 0x00, false);
+                    var y = rom.view.getInt16(offs + 0x02, false);
+                    var z = rom.view.getInt16(offs + 0x04, false);
+                    var sx = rom.view.getInt16(offs + 0x06, false);
+                    var sz = rom.view.getInt16(offs + 0x08, false);
+                    waters[i*3*4+0] = x;
+                    waters[i*3*4+1] = y;
+                    waters[i*3*4+2] = z;
+                    waters[i*3*4+3] = x + sx;
+                    waters[i*3*4+4] = y;
+                    waters[i*3*4+5] = z;
+                    waters[i*3*4+6] = x;
+                    waters[i*3*4+7] = y;
+                    waters[i*3*4+8] = z + sz;
+                    waters[i*3*4+9] = x + sx;
+                    waters[i*3*4+10] = y;
+                    waters[i*3*4+11] = z + sz;
+                    offs += 0x10;
+                }
+                return waters;
+            }
+
+            var watersN = rom.view.getUint16(offs + 0x24, false);
+            var watersAddr = rom.view.getUint32(offs + 0x28, false);
+            var waters = readWaters(watersN, watersAddr);
+
+            return { verts: verts, polys: polys, waters: waters };
         }
 
         function readRoom(file) {
