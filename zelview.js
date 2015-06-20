@@ -344,7 +344,8 @@
                 filename_ = 'ydan_scene';
 
             viewer.loadScene(filename_);
-            deserializeCamera(camera, cameraS);
+            if (cameraS)
+                deserializeCamera(camera, cameraS);
         }
 
         function loadScene(filename) {
