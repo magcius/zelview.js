@@ -389,7 +389,8 @@
         function elemDragger(elem, callback) {
             elem.requestPointerLock = elem.requestPointerLock || elem.mozRequestPointerLock || elem.webkitRequestPointerLock;
 
-            if (elem.requestPointerLock) {
+            // XXX: I don't like the pointer lock behavior right now
+            if (false && elem.requestPointerLock) {
                 return pointerLockDragger(elem, callback);
             } else {
                 return traditionalDragger(elem, callback);
