@@ -129,9 +129,9 @@
                 var offs = rom.lookupAddress(banks, addr);
                 var verts = new Uint16Array(N * 3);
                 for (var i = 0; i < N; i++) {
-                    verts[i*3+0] = rom.view.getUint16(offs + 0x00, false);
-                    verts[i*3+1] = rom.view.getUint16(offs + 0x02, false);
-                    verts[i*3+2] = rom.view.getUint16(offs + 0x04, false);
+                    verts[i*3+0] = rom.view.getInt16(offs + 0x00, false);
+                    verts[i*3+1] = rom.view.getInt16(offs + 0x02, false);
+                    verts[i*3+2] = rom.view.getInt16(offs + 0x04, false);
                     offs += 0x06;
                 }
                 return verts;
@@ -141,9 +141,9 @@
                 var offs = rom.lookupAddress(banks, addr);
                 var polys = new Uint16Array(N * 3);
                 for (var i = 0; i < N; i++) {
-                    polys[i*3+0] = rom.view.getUint16(offs + 0x02, false);
-                    polys[i*3+1] = rom.view.getUint16(offs + 0x04, false);
-                    polys[i*3+2] = rom.view.getUint16(offs + 0x06, false);
+                    polys[i*3+0] = rom.view.getUint16(offs + 0x02, false) & 0x0FFF;
+                    polys[i*3+1] = rom.view.getUint16(offs + 0x04, false) & 0x0FFF;
+                    polys[i*3+2] = rom.view.getUint16(offs + 0x06, false) & 0x0FFF;
                     offs += 0x10;
                 }
                 return polys;

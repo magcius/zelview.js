@@ -90,7 +90,11 @@
 
     var COLL_FRAG_SHADER_SOURCE = M([
         'void main() {',
-        '    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);',
+        '    gl_FragColor = vec4(1.0, 1.0, 1.0, 0.2);',
+        '#ifdef GL_EXT_frag_depth',
+        '#extension GL_EXT_frag_depth : enable',
+        '    gl_FragDepthEXT = gl_FragCoord.z - 1e-6;',
+        '#endif',
         '}',
     ]);
 
@@ -107,10 +111,46 @@
         return prog;
     }
 
-    function makeModelFromScene(scene) {
-        function render(state) {
-            var gl = state.gl;
+    function makeModelFromScene(gl, scene) {
+        var coll = scene.collision;
+        var collVertBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, collVertBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, coll.verts, gl.STATIC_DRAW);
 
+        function stitchLines(ibd) {
+            var lines = new Uint16Array(ibd.length * 2);
+            var o = 0;
+            for (var i = 0; i < ibd.length; i += 3) {
+                lines[o++] = ibd[i+0];
+                lines[o++] = ibd[i+1];
+                lines[o++] = ibd[i+1];
+                lines[o++] = ibd[i+2];
+                lines[o++] = ibd[i+2];
+                lines[o++] = ibd[i+0];
+            }
+            return lines;
+        }
+        var collIdxBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, collIdxBuffer);
+        var lineData = stitchLines(coll.polys);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lineData, gl.STATIC_DRAW);
+        var nPrim = lineData.length;
+
+        function renderCollision(state) {
+            state.useProgram(state.programs_COLL);
+
+            var prog = gl.currentProgram;
+            gl.enable(gl.BLEND);
+            gl.bindBuffer(gl.ARRAY_BUFFER, collVertBuffer);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, collIdxBuffer);
+            gl.vertexAttribPointer(prog.positionLocation, 3, gl.SHORT, false, 0, 0);
+            gl.enableVertexAttribArray(prog.positionLocation);
+            gl.drawElements(gl.LINES, nPrim, gl.UNSIGNED_SHORT, 0);
+            gl.disableVertexAttribArray(prog.positionLocation);
+            gl.disable(gl.BLEND);
+        }
+
+        function render(state) {
             function renderDL(dl) { dl.forEach(function(cmd) { cmd(gl); })}
 
             function renderMesh(mesh) {
@@ -122,6 +162,8 @@
 
             state.useProgram(state.programs_DL);
             scene.rooms.forEach(renderRoom);
+
+            renderCollision(state);
         }
 
         return { render: render };
@@ -203,6 +245,10 @@
     function createViewer() {
         var canvas = document.querySelector("canvas");
         var gl = canvas.getContext("webgl", { alpha: false });
+
+        // Enable EXT_frag_depth
+        gl.getExtension('EXT_frag_depth');
+
         gl.viewportWidth = canvas.width;
         gl.viewportHeight = canvas.height;
 
@@ -261,7 +307,7 @@
             req.onload = function() {
                 var zelview0 = readZELVIEW0(req.response);
                 var zelScene = zelview0.loadMainScene(gl);
-                var model = makeModelFromScene(zelScene);
+                var model = makeModelFromScene(gl, zelScene);
                 scene.setModels([model]);
             };
         }
