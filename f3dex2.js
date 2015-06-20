@@ -359,9 +359,10 @@
         state.paletteTile.pixels = dst;
     }
 
-    function tileCacheKey(tile) {
+    function tileCacheKey(state, tile) {
         // XXX: Do we need more than this?
-        return tile.addr;
+        var srcOffs = state.lookupAddress(tile.addr);
+        return srcOffs;
     }
 
     // XXX: This is global to cut down on resources between DLs.
@@ -370,7 +371,7 @@
         if (tile.textureId)
             return;
 
-        var key = tileCacheKey(tile);
+        var key = tileCacheKey(state, tile);
         var otherTile = tileCache[key];
         if (!otherTile) {
             translateTexture(state, tile);
