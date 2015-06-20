@@ -378,7 +378,9 @@
         };
 
         function loadStateFromHash() {
-            var hash = window.location.hash.slice(1);
+            var hash = window.location.hash;
+            if (!hash) hash = '';
+            hash = hash.slice(1);
             loadState(hash);
         }
 
