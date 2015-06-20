@@ -26,7 +26,7 @@
         return shader;
     }
 
-    var VERT_SHADER_SOURCE = M([
+    var DL_VERT_SHADER_SOURCE = M([
         'uniform mat4 u_modelView;',
         'uniform mat4 u_projection;',
         'attribute vec3 a_position;',
@@ -43,7 +43,7 @@
         '}',
     ]);
 
-    var FRAG_SHADER_SOURCE = M([
+    var DL_FRAG_SHADER_SOURCE = M([
         'precision mediump float;',
         'varying vec2 v_uv;',
         'varying vec4 v_color;',
@@ -60,9 +60,9 @@
         '}',
     ]);
 
-    function createProgram(gl) {
-        var vertShader = compileShader(gl, VERT_SHADER_SOURCE, gl.VERTEX_SHADER);
-        var fragShader = compileShader(gl, FRAG_SHADER_SOURCE, gl.FRAGMENT_SHADER);
+    function createProgram_DL(gl) {
+        var vertShader = compileShader(gl, DL_VERT_SHADER_SOURCE, gl.VERTEX_SHADER);
+        var fragShader = compileShader(gl, DL_FRAG_SHADER_SOURCE, gl.FRAGMENT_SHADER);
         var prog = gl.createProgram();
         gl.attachShader(prog, vertShader);
         gl.attachShader(prog, fragShader);
@@ -78,8 +78,39 @@
         return prog;
     }
 
+    var COLL_VERT_SHADER_SOURCE = M([
+        'uniform mat4 u_modelView;',
+        'uniform mat4 u_projection;',
+        'attribute vec3 a_position;',
+        '',
+        'void main() {',
+        '    gl_Position = u_projection * u_modelView * vec4(a_position, 1.0);',
+        '}',
+    ]);
+
+    var COLL_FRAG_SHADER_SOURCE = M([
+        'void main() {',
+        '    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);',
+        '}',
+    ]);
+
+    function createProgram_COLL(gl) {
+        var vertShader = compileShader(gl, COLL_VERT_SHADER_SOURCE, gl.VERTEX_SHADER);
+        var fragShader = compileShader(gl, COLL_FRAG_SHADER_SOURCE, gl.FRAGMENT_SHADER);
+        var prog = gl.createProgram();
+        gl.attachShader(prog, vertShader);
+        gl.attachShader(prog, fragShader);
+        gl.linkProgram(prog);
+        prog.modelViewLocation = gl.getUniformLocation(prog, "u_modelView");
+        prog.projectionLocation = gl.getUniformLocation(prog, "u_projection");
+        prog.positionLocation = gl.getAttribLocation(prog, "a_position");
+        return prog;
+    }
+
     function makeModelFromScene(scene) {
-        function render(gl) {
+        function render(state) {
+            var gl = state.gl;
+
             function renderDL(dl) { dl.forEach(function(cmd) { cmd(gl); })}
 
             function renderMesh(mesh) {
@@ -88,6 +119,8 @@
             }
 
             function renderRoom(room) { renderMesh(room.mesh); }
+
+            state.useProgram(state.programs_DL);
             scene.rooms.forEach(renderRoom);
         }
 
@@ -134,21 +167,24 @@
         var models = [];
         var scene = {};
 
-        function renderModel(model) {
-            model.render(gl);
-        }
-
-        var prog = createProgram(gl);
-
-        function render() {
-            gl.depthMask(true);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
+        var state = {};
+        state.gl = gl;
+        state.programs_DL = createProgram_DL(gl);
+        state.programs_COLL = createProgram_COLL(gl);
+        state.useProgram = function(prog) {
             gl.currentProgram = prog;
             gl.useProgram(prog);
             gl.uniformMatrix4fv(prog.projectionLocation, false, projection);
             gl.uniformMatrix4fv(prog.modelViewLocation, false, view);
+        };
 
+        function renderModel(model) {
+            model.render(state);
+        }
+
+        function render() {
+            gl.depthMask(true);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             models.forEach(renderModel);
         }
 

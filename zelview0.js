@@ -118,6 +118,43 @@
             return rom.loadAddress(banks, addr);
         }
 
+        function readCollision(collisionAddr) {
+            var offs = rom.lookupAddress(banks, collisionAddr);
+            var vertsN = rom.view.getUint16(offs + 0x0C, false);
+            var vertsAddr = rom.view.getUint32(offs + 0x10, false);
+            var polysN = rom.view.getUint16(offs + 0x14, false);
+            var polysAddr = rom.view.getUint32(offs + 0x18, false);
+
+            function readVerts(N, addr) {
+                var offs = rom.lookupAddress(banks, addr);
+                var verts = new Uint16Array(N * 3);
+                for (var i = 0; i < N; i++) {
+                    verts[i*3+0] = rom.view.getUint16(offs + 0x00, false);
+                    verts[i*3+1] = rom.view.getUint16(offs + 0x02, false);
+                    verts[i*3+2] = rom.view.getUint16(offs + 0x04, false);
+                    offs += 0x06;
+                }
+                return verts;
+            }
+
+            function readPolys(N, addr) {
+                var offs = rom.lookupAddress(banks, addr);
+                var polys = new Uint16Array(N * 3);
+                for (var i = 0; i < N; i++) {
+                    polys[i*3+0] = rom.view.getUint16(offs + 0x02, false);
+                    polys[i*3+1] = rom.view.getUint16(offs + 0x04, false);
+                    polys[i*3+2] = rom.view.getUint16(offs + 0x06, false);
+                    offs += 0x10;
+                }
+                return polys;
+            }
+
+            var verts = readVerts(vertsN, vertsAddr);
+            var polys = readPolys(polysN, polysAddr);
+
+            return { verts: verts, polys: polys };
+        }
+
         function readRoom(file) {
             var banks2 = Object.create(banks);
             banks2.room = file;
@@ -190,15 +227,17 @@
                 break;
 
             switch (cmdType) {
+                case HeaderCommands.Collision:
+                    if (headers.collision) XXX;
+                    headers.collision = readCollision(cmd2);
+                    break;
                 case HeaderCommands.Rooms:
                     var nRooms = (cmd1 >> 16) & 0xFF;
-                    var roomTableAddr = cmd2;
-                    headers.rooms = readRooms(nRooms, roomTableAddr);
+                    headers.rooms = readRooms(nRooms, cmd2);
                     break;
                 case HeaderCommands.Mesh:
                     if (headers.mesh) XXX;
-                    var meshAddr = cmd2;
-                    headers.mesh = readMesh(meshAddr);
+                    headers.mesh = readMesh(cmd2);
                     break;
             }
         }
