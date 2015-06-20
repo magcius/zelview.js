@@ -271,10 +271,8 @@
             document.exitPointerLock();
         });
         function mousemove(e) {
-            var dx = e.movementX || e.mozMovementX || e.webkitMovementX;
-            var dy = e.movementY || e.mozMovementY || e.webkitMovementY;
-            if (!dx || !dy)
-                return;
+            var dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
+            var dy = e.movementY || e.mozMovementY || e.webkitMovementY || 0;
             var cu = [camera[1], camera[5], camera[9]];
             vec3.normalize(cu, cu);
             mat4.rotate(camera, camera, -dx / 500, cu);
