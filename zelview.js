@@ -290,7 +290,7 @@
             var parts = S.split('!');
             var filename_ = parts[0], cameraS = parts[1];
             if (!filename_)
-                return;
+                filename_ = 'ydan_scene';
 
             viewer.loadScene(filename_);
             deserializeCamera(camera, cameraS);
@@ -324,11 +324,8 @@
             stateUpdated();
         };
 
-        var hash = window.location.hash;
-        if (hash) {
-            hash = hash.slice(1);
-            loadState(hash);
-        }
+        var hash = window.location.hash.slice(1);
+        loadState(hash);
 
         var keysDown = {};
         var SHIFT = 16;
