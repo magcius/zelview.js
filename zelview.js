@@ -419,10 +419,13 @@
                 callback(dx, dy);
             }
             function pointerlockchange() {
-                if (isInPointerLock())
+                if (isInPointerLock()) {
                     elem.addEventListener('mousemove', mousemove);
-                else
+                    document.body.classList.add('grabbing');
+                } else {
                     elem.removeEventListener('mousemove', mousemove);
+                    document.body.classList.remove('grabbing');
+                }
             }
             document.addEventListener('pointerlockchange', pointerlockchange);
             document.addEventListener('mozpointerlockchange', pointerlockchange);
@@ -439,11 +442,14 @@
             function mouseup(e) {
                 document.removeEventListener('mouseup', mouseup);
                 document.removeEventListener('mousemove', mousemove);
+                document.body.classList.remove('grabbing');
             }
             elem.addEventListener('mousedown', function(e) {
                 lx = e.pageX; ly = e.pageY;
                 document.addEventListener('mouseup', mouseup);
                 document.addEventListener('mousemove', mousemove);
+                document.body.classList.add('grabbing');
+                e.preventDefault();
             });
         }
 

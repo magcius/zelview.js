@@ -230,6 +230,9 @@
                     entriesAddr += 8;
                 }
             } else if (type == 1) {
+                console.log(rom.lookupAddress(banks, meshAddr).toString(16));
+                var bg = rom.lookupAddress(banks, loadAddress(meshAddr + 0x14));
+                console.log(bg.toString(16));
             } else if (type == 2) {
                 for (var i = 0; i < nEntries; i++) {
                     mesh.opaque.push(readDL(entriesAddr + 8));

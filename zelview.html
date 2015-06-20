@@ -3,9 +3,14 @@
   <head>
     <meta charset="utf8">
     <title>zelview.js</title>
-    <style> button, select { font-size: 150%; } </style>
+    <style>
+    button, select { font-size: 150%; }
+    canvas { cursor: grab; cursor: -webkit-grab; }
+    .grabbing { cursor: grabbing; cursor: -webkit-grabbing; }
+    .grabbing canvas { cursor: inherit; }
+    </style>
   </head>
-  <body>
+  <body class>
     <center>
     <h1>zelview.js</h1>
     <canvas id="scene" width="1368" height="768"></canvas>
