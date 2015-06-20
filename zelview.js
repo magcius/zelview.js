@@ -341,31 +341,67 @@
             delete keysDown[e.keyCode];
         });
 
-        canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock;
-        document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock || document.webkitExitPointerLock;
-        canvas.addEventListener('click', function(e) {
-            if (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas || document.webkitPointerLockElement === canvas)
-                document.exitPointerLock();
-            else
-                canvas.requestPointerLock();
-        });
-        function mousemove(e) {
-            var dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
-            var dy = e.movementY || e.mozMovementY || e.webkitMovementY || 0;
+        function pointerLockDragger(elem, callback) {
+            function isInPointerLock() {
+                return document.pointerLockElement === elem || document.mozPointerLockElement === elem || document.webkitPointerLockElement === elem;
+            }
+            document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock || document.webkitExitPointerLock;
+             elem.addEventListener('click', function(e) {
+                if (isInPointerLock())
+                    document.exitPointerLock();
+                else
+                    elem.requestPointerLock();
+            });
+            function mousemove(e) {
+                var dx = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
+                var dy = e.movementY || e.mozMovementY || e.webkitMovementY || 0;
+                callback(dx, dy);
+            }
+            function pointerlockchange() {
+                if (isInPointerLock())
+                    elem.addEventListener('mousemove', mousemove);
+                else
+                    elem.removeEventListener('mousemove', mousemove);
+            }
+            document.addEventListener('pointerlockchange', pointerlockchange);
+            document.addEventListener('mozpointerlockchange', pointerlockchange);
+            document.addEventListener('webkitpointerlockchange', pointerlockchange);
+        }
+        function traditionalDragger(elem, callback) {
+            var lx, ly;
+
+            function mousemove(e) {
+                var dx = e.pageX - lx, dy = e.pageY - ly;
+                lx = e.pageX; ly = e.pageY;
+                callback(dx, dy);
+            }
+            function mouseup(e) {
+                document.removeEventListener('mouseup', mouseup);
+                document.removeEventListener('mousemove', mousemove);
+            }
+            elem.addEventListener('mousedown', function(e) {
+                lx = e.pageX; ly = e.pageY;
+                document.addEventListener('mouseup', mouseup);
+                document.addEventListener('mousemove', mousemove);
+            });
+        }
+
+        function elemDragger(elem, callback) {
+            elem.requestPointerLock = elem.requestPointerLock || elem.mozRequestPointerLock || elem.webkitRequestPointerLock;
+
+            if (elem.requestPointerLock) {
+                return pointerLockDragger(elem, callback);
+            } else {
+                return traditionalDragger(elem, callback);
+            }
+        }
+
+        elemDragger(canvas, function(dx, dy) {
             var cu = [camera[1], camera[5], camera[9]];
             vec3.normalize(cu, cu);
             mat4.rotate(camera, camera, -dx / 500, cu);
             mat4.rotate(camera, camera, -dy / 500, [1, 0, 0]);
-        }
-        function pointerlockchange() {
-            if (document.pointerLockElement === canvas || document.mozPointerLockElement === canvas || document.webkitPointerLockElement === canvas)
-                canvas.addEventListener('mousemove', mousemove);
-            else
-                canvas.removeEventListener('mousemove', mousemove);
-        }
-        document.addEventListener('pointerlockchange', pointerlockchange);
-        document.addEventListener('mozpointerlockchange', pointerlockchange);
-        document.addEventListener('webkitpointerlockchange', pointerlockchange);
+        });
 
         var tmp = mat4.create();
         var t = 0;
