@@ -452,7 +452,7 @@
 
     function convert_I4(state, texture) {
         var srcOffs = state.lookupAddress(texture.addr);
-        var nBytes = texture.width * texture.height;
+        var nBytes = texture.width * texture.height * 2;
         var dst = new Uint8Array(nBytes);
         var i = 0;
 
@@ -464,9 +464,11 @@
                 p = (b & 0xF0) >> 4;
                 p = p << 4 | p;
                 dst[i++] = p;
+                dst[i++] = p;
 
                 p = (b & 0x0F);
                 p = p << 4 | p;
+                dst[i++] = p;
                 dst[i++] = p;
             }
         }
@@ -525,13 +527,16 @@
 
     function convert_I8(state, texture) {
         var srcOffs = state.lookupAddress(texture.addr);
-        var nBytes = texture.width * texture.height;
+        var nBytes = texture.width * texture.height * 2;
         var dst = new Uint8Array(nBytes);
         var i = 0;
 
         for (var y = 0; y < texture.height; y++) {
-            for (var x = 0; x < texture.width; x++)
-                dst[i++] = state.rom.view.getUint8(srcOffs++);
+            for (var x = 0; x < texture.width; x++) {
+                var p = state.rom.view.getUint8(srcOffs++);
+                dst[i++] = p;
+                dst[i++] = p;
+            }
         }
 
         texture.pixels = dst;
@@ -669,7 +674,7 @@
             case 0x00: return "rgba8"; // RGBA
             case 0x40: return "rgba8"; // CI -- XXX -- do we need to check the palette type?
             case 0x60: return "i8_a8"; // IA
-            case 0x80: return "i8";    // I
+            case 0x80: return "i8_a8";    // I
             default: XXX;
         }
     }
