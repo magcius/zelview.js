@@ -264,6 +264,7 @@
                 var mt1 = rom.view.getUint16(offs, false);
                 var mt2 = rom.view.getUint16(offs + 32, false);
                 mtx[(x * 4) + y] = ((mt1 << 16) | (mt2)) * (1 / 0x10000);
+                offs += 2;
             }
         }
 
