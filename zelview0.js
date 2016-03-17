@@ -185,7 +185,29 @@
             var watersAddr = rom.view.getUint32(offs + 0x28, false);
             var waters = readWaters(watersN, watersAddr);
 
-            return { verts: verts, polys: polys, waters: waters };
+            function readCamera(addr) {
+                var skyboxCamera = loadAddress(addr + 0x04);
+                var offs = rom.lookupAddress(banks, skyboxCamera);
+                var x = rom.view.getInt16(offs + 0x00, false);
+                var y = rom.view.getInt16(offs + 0x02, false);
+                var z = rom.view.getInt16(offs + 0x04, false);
+                var a = rom.view.getUint16(offs + 0x06, false) / 0xFFFF * (Math.PI * 2);
+                var b = rom.view.getUint16(offs + 0x08, false) / 0xFFFF * (Math.PI * 2) + Math.PI;
+                var c = rom.view.getUint16(offs + 0x0A, false) / 0xFFFF * (Math.PI * 2);
+                var d = rom.view.getUint16(offs + 0x0C, false);
+
+                var mtx = mat4.create();
+                mat4.translate(mtx, mtx, [x, y, z]);
+                mat4.rotateZ(mtx, mtx, c);
+                mat4.rotateY(mtx, mtx, b);
+                mat4.rotateX(mtx, mtx, -a);
+                return mtx;
+            }
+
+            var cameraAddr = rom.view.getUint32(offs + 0x20, false);
+            var camera = readCamera(cameraAddr);
+
+            return { verts: verts, polys: polys, waters: waters, camera: camera };
         }
 
         function readRoom(file) {
@@ -203,6 +225,86 @@
                 roomTableAddr += 8;
             }
             return rooms;
+        }
+
+        function loadImage(gl, src) {
+            var canvas = document.createElement('canvas');
+            var ctx = canvas.getContext('2d');
+
+            var texId = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texId);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+            var img = document.createElement('img');
+            img.src = src;
+            var textures = document.querySelector('#textures');
+            textures.appendChild(img);
+
+            var aspect = 1;
+
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+
+                var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                gl.bindTexture(gl.TEXTURE_2D, texId);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, imgData.width, imgData.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, imgData.data);
+            };
+
+            // XXX: Should pull this dynamically at runtime.
+            var imgWidth = 320;
+            var imgHeight = 240;
+
+            var imgAspect = imgWidth / imgHeight;
+            var viewportAspect = gl.viewportWidth / gl.viewportHeight;
+
+            var x = imgAspect / viewportAspect;
+
+            var vertData = new Float32Array([
+                /* x   y   z   u  v */
+                  -x, -1,  0,  0, 1,
+                   x, -1,  0,  1, 1,
+                  -x,  1,  0,  0, 0,
+                   x,  1,  0,  1, 0,
+            ]);
+
+            var vertBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertData, gl.STATIC_DRAW);
+
+            var idxData = new Uint8Array([
+                0, 1, 2, 3,
+            ]);
+
+            var idxBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idxData, gl.STATIC_DRAW);
+
+            // 3 pos + 2 uv
+            var VERTEX_SIZE = 5;
+            var VERTEX_BYTES = VERTEX_SIZE * Float32Array.BYTES_PER_ELEMENT;
+
+            return function(gl) {
+                var prog = gl.currentProgram;
+                gl.disable(gl.BLEND);
+                gl.disable(gl.DEPTH_TEST);
+                gl.bindBuffer(gl.ARRAY_BUFFER, vertBuffer);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuffer);
+                gl.vertexAttribPointer(prog.positionLocation, 3, gl.FLOAT, false, VERTEX_BYTES, 0);
+                gl.vertexAttribPointer(prog.uvLocation, 2, gl.FLOAT, false, VERTEX_BYTES, 3 * Float32Array.BYTES_PER_ELEMENT);
+                gl.enableVertexAttribArray(prog.positionLocation);
+                gl.enableVertexAttribArray(prog.uvLocation);
+                gl.bindTexture(gl.TEXTURE_2D, texId);
+                gl.drawElements(gl.TRIANGLE_STRIP, 4, gl.UNSIGNED_BYTE, 0);
+                gl.disableVertexAttribArray(prog.positionLocation);
+                gl.disableVertexAttribArray(prog.uvLocation);
+            };
         }
 
         function readMesh(meshAddr) {
@@ -230,9 +332,15 @@
                     entriesAddr += 8;
                 }
             } else if (type == 1) {
-                console.log(rom.lookupAddress(banks, meshAddr).toString(16));
-                var bg = rom.lookupAddress(banks, loadAddress(meshAddr + 0x14));
-                console.log(bg.toString(16));
+                // The last entry always seems to contain the BG. Not sure
+                // what the other data is about... maybe the VR skybox for rotating scenes?
+                var lastEntry = nEntries - 1;
+                var bg = loadAddress(meshAddr + (lastEntry * 0x0C) + 0x08);
+                var bgOffs = rom.lookupAddress(banks, bg);
+                var buffer = rom.view.buffer.slice(bgOffs);
+                var blob = new Blob([buffer], { type: 'image/jpeg' });
+                var url = window.URL.createObjectURL(blob);
+                mesh.bg = loadImage(gl, url);
             } else if (type == 2) {
                 for (var i = 0; i < nEntries; i++) {
                     mesh.opaque.push(readDL(entriesAddr + 8));

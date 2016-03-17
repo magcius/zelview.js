@@ -26,6 +26,39 @@
         return shader;
     }
 
+    var BG_VERT_SHADER_SOURCE = M([
+        'attribute vec3 a_position;',
+        'attribute vec2 a_uv;',
+        'varying vec2 v_uv;',
+        '',
+        'void main() {',
+        '    gl_Position = vec4(a_position, 1.0);',
+        '    v_uv = a_uv;',
+        '}',
+    ]);
+
+    var BG_FRAG_SHADER_SOURCE = M([
+        'precision mediump float;',
+        'varying vec2 v_uv;',
+        'uniform sampler2D u_texture;',
+        '',
+        'void main() {',
+        '    gl_FragColor = texture2D(u_texture, v_uv);',
+        '}',
+    ]);
+
+    function createProgram_BG(gl) {
+        var vertShader = compileShader(gl, BG_VERT_SHADER_SOURCE, gl.VERTEX_SHADER);
+        var fragShader = compileShader(gl, BG_FRAG_SHADER_SOURCE, gl.FRAGMENT_SHADER);
+        var prog = gl.createProgram();
+        gl.attachShader(prog, vertShader);
+        gl.attachShader(prog, fragShader);
+        gl.linkProgram(prog);
+        prog.positionLocation = gl.getAttribLocation(prog, "a_position");
+        prog.uvLocation = gl.getAttribLocation(prog, "a_uv");
+        return prog;
+    }
+
     var DL_VERT_SHADER_SOURCE = M([
         'uniform mat4 u_modelView;',
         'uniform mat4 u_projection;',
@@ -202,6 +235,12 @@
             function renderDL(dl) { dl.forEach(function(cmd) { cmd(gl); })}
 
             function renderMesh(mesh) {
+                if (mesh.bg) {
+                    state.useProgram(state.programs_BG);
+                    mesh.bg(gl);
+                }
+
+                state.useProgram(state.programs_DL);
                 mesh.opaque.forEach(renderDL);
                 mesh.transparent.forEach(renderDL);
             }
@@ -259,6 +298,7 @@
 
         var state = {};
         state.gl = gl;
+        state.programs_BG = createProgram_BG(gl);
         state.programs_DL = createProgram_DL(gl);
         state.programs_COLL = createProgram_COLL(gl);
         state.programs_WATERS = createProgram_WATERS(gl);
@@ -360,6 +400,7 @@
                 var zelview0 = readZELVIEW0(req.response);
                 var zelScene = zelview0.loadMainScene(gl);
                 var model = makeModelFromScene(gl, zelScene);
+                mat4.copy(camera, zelScene.collision.camera);
                 scene.setModels([model]);
             };
         }
