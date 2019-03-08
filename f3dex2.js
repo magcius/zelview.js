@@ -1,6 +1,9 @@
 (function(exports) {
     "use strict";
 
+    var mat4 = glMatrix.mat4;
+    var vec3 = glMatrix.vec3;
+    
     // Zelda uses the F3DEX2 display list format. This implements
     // a simple (and probably wrong!) HLE renderer for it.
 
