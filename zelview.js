@@ -1,6 +1,8 @@
 (function(exports) {
     "use strict";
 
+    var mat4 = glMatrix.mat4;
+    
     function fetch(path, responseType) {
         var request = new XMLHttpRequest();
         request.open("GET", path, true);
