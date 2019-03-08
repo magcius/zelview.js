@@ -1,6 +1,8 @@
 (function(exports) {
     "use strict";
 
+    var mat4 = glMatrix.mat4;
+    
     // Loads the ZELVIEW0 format.
 
     function read0String(buffer, offs, length) {
